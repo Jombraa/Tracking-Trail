@@ -1,7 +1,7 @@
 // TaskTrail service worker.
 // HTML: network-first (so app updates are picked up on next launch when online).
 // Static assets: cache-first (fast, offline-capable).
-const CACHE = "tasktrail-v6";
+const CACHE = "tasktrail-v7";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest", "./icon.png"];
 
 self.addEventListener("install", (e) => {

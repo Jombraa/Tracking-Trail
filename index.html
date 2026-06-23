@@ -166,7 +166,7 @@
     position: relative; width: var(--node); height: var(--node);
     display: grid; place-items: center;
   }
-  .node.group { width: 84px; height: 84px; }
+  .node.ringed { width: 84px; height: 84px; }
   .node .ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); z-index: 0; }
   .node .ring circle { transition: stroke-dashoffset .45s cubic-bezier(.34,1.3,.64,1); }
   .node .ring .ring-track { stroke: var(--ring-track); }
@@ -485,6 +485,18 @@
   .lesson-timer.running { color: var(--accent); }
   .lesson-action.start { background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
   .lesson-action.skip { background: var(--bg-elev3); color: var(--text); box-shadow: 0 4px 0 rgba(0,0,0,.18); }
+
+  /* ── Weekly node "done today, not yet met" state ── */
+  .node-row.rested .face { background: var(--frost); }
+  .node-row.rested .shadow { background: #2d6f7d; }
+
+  /* ── Segmented control (repeat mode) ── */
+  .seg { display: flex; gap: 4px; padding: 4px; margin: 6px; background: var(--bg-elev2); border-radius: 11px; }
+  .seg-btn { flex: 1; padding: 9px 8px; border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--text-secondary); }
+  .seg-btn.sel { background: var(--bg-elev); color: var(--text); box-shadow: 0 1px 2px var(--shadow); }
+  .stepper-inline { display: inline-flex; align-items: center; gap: 14px; }
+  .step-btn.sm { width: 34px; height: 34px; font-size: 22px; }
+  .step-val.sm { font-size: 22px; min-width: 24px; text-align: center; }
 </style>
 </head>
 <body>
@@ -528,6 +540,25 @@
       </div>
 
       <div class="form-section">
+        <div class="label">Repeat</div>
+        <div class="card">
+          <div class="seg" id="repeat-seg">
+            <button type="button" class="seg-btn sel" data-rep="daily">Every day</button>
+            <button type="button" class="seg-btn" data-rep="weekly">Times per week</button>
+          </div>
+          <div class="row" id="perweek-row" style="display:none">
+            <span class="row-label">Days per week</span>
+            <span class="stepper-inline">
+              <button type="button" class="step-btn sm" id="pw-minus">–</button>
+              <span class="step-val sm" id="pw-count">3</span>
+              <button type="button" class="step-btn sm" id="pw-plus">+</button>
+            </span>
+          </div>
+        </div>
+        <div class="footer" id="repeat-foot">Do this every day to keep your streak.</div>
+      </div>
+
+      <div class="form-section" id="group-section">
         <div class="label">Group</div>
         <div class="card">
           <div class="row">
@@ -610,6 +641,13 @@
       </div>
 
       <div class="form-section">
+        <div class="label">Trail</div>
+        <div class="card">
+          <button class="list-btn" id="arrange-btn">Arrange trail order</button>
+        </div>
+      </div>
+
+      <div class="form-section">
         <div class="label">Stats</div>
         <div class="card">
           <div class="row"><span class="row-label">Current streak</span><span class="stat" id="stat-cur">0</span></div>
@@ -625,6 +663,22 @@
       </div>
     </div>
     <input type="file" id="import-file" accept="application/json,.json" style="display:none" />
+  </div>
+
+  <!-- Arrange trail sheet -->
+  <div class="sheet" id="arrange-sheet">
+    <div class="sheet-nav">
+      <button id="arrange-close">Done</button>
+      <span class="title">Arrange trail</span>
+      <span style="width:52px"></span>
+    </div>
+    <div class="sheet-body">
+      <div class="form-section">
+        <div class="label">Order on the trail</div>
+        <div class="card" id="arrange-list"></div>
+        <div class="footer">Move groups and tasks up or down to change where they sit on your trail.</div>
+      </div>
+    </div>
   </div>
 
   <!-- Tap bubble -->
@@ -747,6 +801,20 @@ function formatTime(s) {
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
 }
 
+// ── Weekly tasks ── (perWeek > 0 and not in a group = a weekly task)
+function weekStartKey(k) {
+  const d = parseKey(k);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
+  return dateKey(d);
+}
+function isWeekly(task) { return (task.perWeek || 0) > 0 && !task.groupName; }
+function weeklyDone(task) {
+  const ws = weekStartKey(todayKey());
+  const we = addDaysKey(ws, 6);
+  return db.completions.filter((c) => c.taskID === task.id && c.dateCompleted >= ws && c.dateCompleted <= we).length;
+}
+function weeklyMet(task) { return weeklyDone(task) >= (task.perWeek || 0); }
+
 // ─────────────────────────────────────────────────────────────
 // StreakEngine  (faithful port of StreakEngine.swift)
 // ─────────────────────────────────────────────────────────────
@@ -756,13 +824,14 @@ const StreakEngine = {
     this.penaliseMissedDays();
   },
 
+  // The daily streak is gated only by daily tasks; weekly tasks are flexible
+  // and never block the day's completion.
   allTasksDoneToday(extra) {
-    if (db.tasks.length === 0) return false;
     const t = todayKey();
     const comps = extra ? db.completions.concat(extra) : db.completions;
-    return db.tasks.every((task) =>
-      comps.some((c) => c.taskID === task.id && c.dateCompleted === t)
-    );
+    const daily = db.tasks.filter((task) => !isWeekly(task));
+    if (daily.length === 0) return false;
+    return daily.every((task) => comps.some((c) => c.taskID === task.id && c.dateCompleted === t));
   },
 
   evaluateAfterToggle(extra) {
@@ -851,6 +920,17 @@ function normalizeOrder() {
   for (const u of buildUnits()) for (const t of u.tasks) t.sortOrder = i++;
 }
 
+// Move a whole unit (group or standalone task) up/down the trail.
+function moveUnit(index, dir) {
+  const units = buildUnits();
+  const j = index + dir;
+  if (j < 0 || j >= units.length) return;
+  [units[index], units[j]] = [units[j], units[index]];
+  let i = 0;
+  for (const u of units) for (const t of u.tasks) t.sortOrder = i++;
+  save();
+}
+
 // Move a step up/down within its group.
 function moveStep(id, dir) {
   const t = db.tasks.find((x) => x.id === id);
@@ -904,9 +984,16 @@ function buildTrail() {
       });
     } else {
       const task = unit.tasks[0];
+      const weekly = isWeekly(task);
       items.push({
         type: "node", kind: "single", nodeId: "task-" + task.id,
-        task, trailIndex, completed: doneToday(task), live: isLive(task),
+        task, trailIndex, live: isLive(task),
+        weekly,
+        doneToday: doneToday(task),
+        weekDone: weekly ? weeklyDone(task) : 0,
+        weekTarget: weekly ? task.perWeek : 0,
+        weekMet: weekly ? weeklyMet(task) : false,
+        completed: weekly ? weeklyMet(task) : doneToday(task),
       });
     }
     trailIndex++;
@@ -1038,8 +1125,9 @@ function render() {
   drawTrailPath();
 }
 
-// Signature: a winding trail line linking the waypoints. The portion you've
-// already walked (up to your last completed node) is solid; the rest is faint.
+// Signature: a winding trail line linking the waypoints. A segment is drawn solid
+// ("walked") only when BOTH waypoints it connects are complete — so weekly tasks
+// completing out of order never paint over an unfinished stretch.
 function drawTrailPath() {
   const trail = $("trail");
   const rows = [...trail.querySelectorAll(".node-row")];
@@ -1057,9 +1145,6 @@ function drawTrailPath() {
     };
   });
 
-  let lastDone = -1;
-  pts.forEach((p, i) => { if (p.done) lastDone = i; });
-
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.id = "trail-path";
@@ -1072,11 +1157,16 @@ function drawTrailPath() {
   faint.setAttribute("class", "tp-faint");
   svg.appendChild(faint);
 
-  if (lastDone >= 1) {
-    const solidD = pts.slice(0, lastDone + 1)
-      .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  // Solid only on fully-completed segments.
+  let segs = "";
+  for (let i = 1; i < pts.length; i++) {
+    if (pts[i - 1].done && pts[i].done) {
+      segs += `M${pts[i - 1].x.toFixed(1)} ${pts[i - 1].y.toFixed(1)} L${pts[i].x.toFixed(1)} ${pts[i].y.toFixed(1)} `;
+    }
+  }
+  if (segs) {
     const solid = document.createElementNS(ns, "path");
-    solid.setAttribute("d", solidD);
+    solid.setAttribute("d", segs.trim());
     solid.setAttribute("class", "tp-solid");
     svg.appendChild(solid);
   }
@@ -1087,7 +1177,18 @@ const RING_CIRC = 289.03; // 2·π·46
 
 function renderItem(item) {
   const x = Math.sin(item.trailIndex * Math.PI / 2) * AMPLITUDE;
-  return item.kind === "group" ? renderGroupNode(item, x) : renderSingleNode(item, x);
+  if (item.kind === "group") return renderGroupNode(item, x);
+  if (item.weekly) return renderWeeklyNode(item, x);
+  return renderSingleNode(item, x);
+}
+
+function ringSVG(prog, complete) {
+  const offset = RING_CIRC * (1 - Math.max(0, Math.min(1, prog)));
+  const stroke = complete ? "var(--green)" : "var(--accent)";
+  return `<svg class="ring" viewBox="0 0 100 100">
+    <circle class="ring-track" cx="50" cy="50" r="46" fill="none" stroke-width="7"/>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="${stroke}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${RING_CIRC}" stroke-dashoffset="${offset}"/>
+  </svg>`;
 }
 
 function renderSingleNode(item, x) {
@@ -1107,22 +1208,35 @@ function renderSingleNode(item, x) {
   </div>`;
 }
 
+function renderWeeklyNode(item, x) {
+  const t = item.task;
+  const met = item.weekMet;
+  let cls = met ? "completed" : item.doneToday ? "rested" : item.live ? "live" : "gold";
+  const inner = met ? CHECK_SVG : iconMarkup(t.emoji, "node-ic");
+  const sub = met ? "Done this week"
+    : item.doneToday ? `Done today · ${item.weekDone}/${item.weekTarget}`
+    : `${item.weekDone}/${item.weekTarget} this week`;
+  return `<div class="node-row weekly ${cls}" style="transform:translateX(${x}px)" data-node="${item.nodeId}">
+    <div class="node ringed">
+      ${ringSVG(item.weekTarget ? item.weekDone / item.weekTarget : 0, met)}
+      <div class="shadow"></div>
+      <div class="face">${inner}</div>
+    </div>
+    <div class="node-label">${esc(t.name)}</div>
+    <div class="node-sub">${sub}</div>
+  </div>`;
+}
+
 function renderGroupNode(item, x) {
   const complete = item.completed;
   const active = item.activeTask;
   let cls = "group " + (complete ? "completed" : item.live ? "live" : "gold");
   const inner = complete ? CHECK_SVG : active ? iconMarkup(active.emoji, "node-ic") : "";
-  const prog = item.total ? item.doneCount / item.total : 0;
-  const offset = RING_CIRC * (1 - prog);
-  const ringStroke = complete ? "var(--green)" : "var(--accent)";
   const time = active ? timeLabel(active) : "";
   const sub = complete ? "All done" : active ? esc(active.name) : "";
   return `<div class="node-row ${cls}" style="transform:translateX(${x}px)" data-node="${item.nodeId}">
-    <div class="node group">
-      <svg class="ring" viewBox="0 0 100 100">
-        <circle class="ring-track" cx="50" cy="50" r="46" fill="none" stroke-width="7"/>
-        <circle cx="50" cy="50" r="46" fill="none" stroke="${ringStroke}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${RING_CIRC}" stroke-dashoffset="${offset}"/>
-      </svg>
+    <div class="node ringed">
+      ${ringSVG(item.total ? item.doneCount / item.total : 0, complete)}
       <div class="shadow"></div>
       <div class="face">${inner}</div>
     </div>
@@ -1183,7 +1297,20 @@ function openBubble(item) {
   $("bubble-title").textContent = item.kind === "group" ? item.group : item.task.name;
   link.style.display = "none";
 
-  if (item.completed) {
+  if (item.weekly) {
+    if (item.weekMet) {
+      $("bubble-sub").textContent = `Complete this week · ${item.weekDone}/${item.weekTarget}`;
+      btn.className = "bubble-btn undo"; btn.textContent = "DONE";
+      link.style.display = ""; link.textContent = "Undo last";
+    } else if (item.doneToday) {
+      $("bubble-sub").textContent = `Done today · ${item.weekDone}/${item.weekTarget} this week`;
+      btn.className = "bubble-btn undo"; btn.textContent = "DONE";
+      link.style.display = ""; link.textContent = "Mark today not done";
+    } else {
+      $("bubble-sub").textContent = `${item.weekDone}/${item.weekTarget} this week`;
+      btn.className = "bubble-btn"; btn.textContent = "START";
+    }
+  } else if (item.completed) {
     $("bubble-sub").textContent = "Completed today";
     btn.className = "bubble-btn undo";
     btn.textContent = item.kind === "group" ? "REVIEW STEPS" : "DONE";
@@ -1233,6 +1360,11 @@ function closeBubble() {
 function bubbleAction() {
   const item = bubbleItem;
   if (!item) return;
+  if (item.weekly) {
+    closeBubble();
+    if (!item.weekMet && !item.doneToday) openLesson(item); // START
+    return; // DONE just closes
+  }
   if (item.completed) {
     closeBubble();
     if (item.kind === "group") openGroup(item.group);
@@ -1246,8 +1378,19 @@ function bubbleUndo() {
   const item = bubbleItem;
   if (!item) return;
   const today = todayKey();
-  const ids = item.kind === "group" ? item.tasks.map((t) => t.id) : [item.task.id];
-  db.completions = db.completions.filter((c) => !(ids.includes(c.taskID) && c.dateCompleted === today));
+  if (item.weekly) {
+    const mine = db.completions.filter((c) => c.taskID === item.task.id);
+    // Prefer undoing today's; otherwise the most recent completion this week.
+    let target = mine.find((c) => c.dateCompleted === today);
+    if (!target) {
+      const ws = weekStartKey(today);
+      target = mine.filter((c) => c.dateCompleted >= ws).sort((a, b) => (a.dateCompleted < b.dateCompleted ? 1 : -1))[0];
+    }
+    if (target) db.completions = db.completions.filter((c) => c !== target);
+  } else {
+    const ids = item.kind === "group" ? item.tasks.map((t) => t.id) : [item.task.id];
+    db.completions = db.completions.filter((c) => !(ids.includes(c.taskID) && c.dateCompleted === today));
+  }
   save();
   closeBubble();
   render();
@@ -1387,9 +1530,14 @@ function completeCurrentStep() {
   const res = recordCompletion(task);
   updateLessonProgress(lesson.index + 1);
   const isLast = lesson.index >= lesson.steps.length - 1;
+  let weeklyMsg = null;
+  if (isWeekly(task)) {
+    const dn = weeklyDone(task);
+    weeklyMsg = dn >= task.perWeek ? "Weekly goal complete" : `${dn}/${task.perWeek} this week`;
+  }
   if (isLast) {
     showStepCard(task, false, true); // celebratory coin
-    showCongrats(res.streakMsg || FINALE_MSGS[lesson.index % FINALE_MSGS.length]);
+    showCongrats(weeklyMsg || res.streakMsg || FINALE_MSGS[lesson.index % FINALE_MSGS.length]);
     setLessonButton("FINISHED", "", "finish");
     fireConfetti();
   } else {
@@ -1497,10 +1645,23 @@ function fireConfetti() {
 // Add / Edit sheet
 // ─────────────────────────────────────────────────────────────
 let editing = null;   // task being edited, or null for new
-let pickedEmoji = "⭐️";
+let pickedEmoji = "star";
+let repeatMode = "daily"; // "daily" | "weekly"
+let perWeekVal = 3;
 
 function existingGroups() {
   return [...new Set(db.tasks.map((t) => t.groupName).filter(Boolean))].sort();
+}
+
+function updateRepeatUI() {
+  document.querySelectorAll("#repeat-seg .seg-btn").forEach((b) => b.classList.toggle("sel", b.dataset.rep === repeatMode));
+  const weekly = repeatMode === "weekly";
+  $("perweek-row").style.display = weekly ? "" : "none";
+  $("pw-count").textContent = perWeekVal;
+  $("group-section").style.display = weekly ? "none" : ""; // weekly tasks are standalone
+  $("repeat-foot").textContent = weekly
+    ? `Complete it on any ${perWeekVal} day${perWeekVal === 1 ? "" : "s"} each week — once per day. Won't affect your daily streak.`
+    : "Do this every day to keep your streak.";
 }
 
 function openAdd() {
@@ -1517,6 +1678,7 @@ function openAdd() {
   $("timer-row").style.display = "none";
   $("timer-min").value = 2;
   $("timer-sec").value = 0;
+  repeatMode = "daily"; perWeekVal = 3; updateRepeatUI();
   $("emoji-btn").innerHTML = iconMarkup(pickedEmoji, "pick-lg");
   $("delete-section").style.display = "none";
   renderGroupChips();
@@ -1540,6 +1702,10 @@ function openEdit(task) {
   $("timer-row").style.display = ts > 0 ? "" : "none";
   $("timer-min").value = Math.floor(ts / 60);
   $("timer-sec").value = ts % 60;
+  const pw = task.perWeek || 0;
+  repeatMode = pw > 0 && !task.groupName ? "weekly" : "daily";
+  perWeekVal = pw > 0 ? pw : 3;
+  updateRepeatUI();
   $("emoji-btn").innerHTML = iconMarkup(pickedEmoji, "pick-lg");
   $("delete-section").style.display = "";
   renderGroupChips();
@@ -1567,7 +1733,9 @@ function saveTask() {
   const name = $("name-input").value.trim();
   if (!name) return;
   const description = $("desc-input").value.trim();
-  const group = $("group-input").value.trim();
+  const weekly = repeatMode === "weekly";
+  const perWeek = weekly ? perWeekVal : 0;
+  const group = weekly ? "" : $("group-input").value.trim(); // weekly tasks are standalone
   const hasDue = $("due-toggle").checked;
   const dueTime = $("due-input").value || "09:00";
   const timerSec = $("timer-toggle").checked
@@ -1576,11 +1744,11 @@ function saveTask() {
 
   if (editing) {
     editing.name = name; editing.emoji = pickedEmoji; editing.groupName = group;
-    editing.description = description;
+    editing.description = description; editing.perWeek = perWeek;
     editing.hasDueTime = hasDue; editing.dueTime = dueTime; editing.timerSec = timerSec;
   } else {
     const maxOrder = db.tasks.reduce((m, t) => Math.max(m, t.sortOrder), -1);
-    db.tasks.push({ id: uid(), name, emoji: pickedEmoji, description, groupName: group, hasDueTime: hasDue, dueTime, timerSec, sortOrder: maxOrder + 1 });
+    db.tasks.push({ id: uid(), name, emoji: pickedEmoji, description, groupName: group, perWeek, hasDueTime: hasDue, dueTime, timerSec, sortOrder: maxOrder + 1 });
   }
   normalizeOrder();
   save();
@@ -1596,6 +1764,40 @@ function deleteTask() {
   save();
   hideSheet("edit-sheet");
   render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Arrange trail (reorder whole units)
+// ─────────────────────────────────────────────────────────────
+function openArrange() {
+  renderArrangeList();
+  showSheet("arrange-sheet");
+}
+function renderArrangeList() {
+  const units = buildUnits();
+  if (units.length === 0) { hideSheet("arrange-sheet"); return; }
+  $("arrange-list").innerHTML = units.map((u, i) => {
+    const isGroup = !!u.group;
+    const icon = isGroup ? iconMarkup(u.tasks[0].emoji, "row-ic") : iconMarkup(u.tasks[0].emoji, "row-ic");
+    const name = isGroup ? esc(u.group) : esc(u.tasks[0].name);
+    const meta = isGroup ? `${u.tasks.length} step${u.tasks.length === 1 ? "" : "s"}`
+      : (isWeekly(u.tasks[0]) ? `${u.tasks[0].perWeek}× / week` : "Daily");
+    return `<div class="row grow-edit">
+      <span class="reorder">
+        <button class="rbtn" data-act="up" data-i="${i}" ${i === 0 ? "disabled" : ""}>${gChevron("up")}</button>
+        <button class="rbtn" data-act="down" data-i="${i}" ${i === units.length - 1 ? "disabled" : ""}>${gChevron("down")}</button>
+      </span>
+      <span class="row-ic-wrap">${icon}</span>
+      <span class="row-label">${name}<span class="row-meta"> · ${meta}</span></span>
+    </div>`;
+  }).join("");
+  $("arrange-list").querySelectorAll("[data-act]").forEach((el) => {
+    el.onclick = () => {
+      moveUnit(parseInt(el.dataset.i, 10), el.dataset.act === "up" ? -1 : 1);
+      renderArrangeList();
+      render();
+    };
+  });
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1801,6 +2003,11 @@ $("emoji-btn").onclick = openEmojiPicker;
 $("emoji-cancel").onclick = () => hideSheet("emoji-sheet");
 $("due-toggle").onchange = (e) => { $("due-time-row").style.display = e.target.checked ? "" : "none"; };
 $("timer-toggle").onchange = (e) => { $("timer-row").style.display = e.target.checked ? "" : "none"; };
+document.querySelectorAll("#repeat-seg .seg-btn").forEach((b) => {
+  b.onclick = () => { repeatMode = b.dataset.rep; updateRepeatUI(); };
+});
+$("pw-minus").onclick = () => { perWeekVal = Math.max(1, perWeekVal - 1); updateRepeatUI(); };
+$("pw-plus").onclick = () => { perWeekVal = Math.min(7, perWeekVal + 1); updateRepeatUI(); };
 $("settings-btn").onclick = openSettings;
 $("settings-close").onclick = () => hideSheet("settings-sheet");
 $("export-btn").onclick = exportBackup;
@@ -1814,6 +2021,8 @@ $("import-file").onchange = (e) => {
   e.target.value = "";
 };
 $("reset-btn").onclick = resetAll;
+$("arrange-btn").onclick = () => { hideSheet("settings-sheet"); openArrange(); };
+$("arrange-close").onclick = () => hideSheet("arrange-sheet");
 $("bubble-btn").onclick = bubbleAction;
 $("bubble-link").onclick = bubbleUndo;
 $("bubble-backdrop").onclick = closeBubble;
@@ -1828,7 +2037,7 @@ $("copy-cancel").onclick = closeCopyDialog;
 $("copy-confirm").onclick = confirmCopy;
 $("dialog-backdrop").onclick = closeCopyDialog;
 $("sheet-backdrop").onclick = () => {
-  ["emoji-sheet", "edit-sheet", "settings-sheet", "group-sheet"].forEach((id) => { if ($(id).classList.contains("show")) hideSheet(id); });
+  ["emoji-sheet", "edit-sheet", "settings-sheet", "group-sheet", "arrange-sheet"].forEach((id) => { if ($(id).classList.contains("show")) hideSheet(id); });
 };
 
 // Re-evaluate "live" nodes periodically
