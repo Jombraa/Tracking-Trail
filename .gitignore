@@ -1,0 +1,15 @@
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+build/
+DerivedData/
+*.xcscmblueprint
+
+# Editor / tooling
+.claude/
+
+# Web build artifact
+tasktrail-web.zip

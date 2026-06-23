@@ -1,0 +1,14 @@
+{
+  "name": "TaskTrail",
+  "short_name": "TaskTrail",
+  "description": "A daily habit trail with streaks and freezes.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10130F",
+  "theme_color": "#10130F",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

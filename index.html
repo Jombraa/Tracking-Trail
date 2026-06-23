@@ -1,0 +1,1854 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<title>TaskTrail</title>
+<meta name="theme-color" content="#10130F" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="TaskTrail" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="apple-touch-icon" href="icon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Trail-map identity — warm parchment, earthy accents */
+    --font-display: 'Bricolage Grotesque', -apple-system, system-ui, sans-serif;
+    --font-ui: 'Figtree', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --accent: #DD6A30;          /* ember */
+    --accent-dark: #B5531F;
+    --bg: #F4EFE4;              /* parchment */
+    --bg-grouped: #ECE4D4;
+    --bg-elev: #FBF7EE;
+    --bg-elev2: #EFE7D6;
+    --bg-elev3: #E2D7C0;
+    --text: #241F17;
+    --text-secondary: rgba(36, 31, 23, 0.56);
+    --text-tertiary: rgba(36, 31, 23, 0.34);
+    --separator: rgba(36, 31, 23, 0.12);
+    --green: #3FA56B;          /* moss (completed / go) */
+    --green-dark: #2A7A4B;
+    --gold: #C39B52;           /* sand (pending waypoint) */
+    --gold-dark: #94702F;
+    --orange: #DD6A30;         /* ember (live / streak) */
+    --orange-dark: #B5531F;
+    --frost: #4F9DB0;          /* freeze */
+    --gray: #CDC3B0;
+    --gray-dark: #B0A48C;
+    --shadow: rgba(72, 52, 26, 0.16);
+    --ring-track: rgba(120, 105, 78, 0.20);
+    --node: 64px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent: #EC7B43;
+      --accent-dark: #B5531F;
+      --bg: #10130F;            /* deep pine-ink */
+      --bg-grouped: #181C14;
+      --bg-elev: #1C2118;
+      --bg-elev2: #252B1F;
+      --bg-elev3: #2F362A;
+      --text: #F1EEE4;
+      --text-secondary: rgba(241, 238, 228, 0.58);
+      --text-tertiary: rgba(241, 238, 228, 0.32);
+      --separator: rgba(241, 238, 228, 0.12);
+      --green: #56B57C;
+      --green-dark: #2F7A4E;
+      --gold: #CBA86A;
+      --gold-dark: #8A6E3C;
+      --orange: #EC7B43;
+      --orange-dark: #B5531F;
+      --frost: #79C6D6;
+      --gray: #39402F;
+      --gray-dark: #525A47;
+      --shadow: rgba(0, 0, 0, 0.5);
+      --ring-track: rgba(190, 178, 150, 0.16);
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: var(--font-ui);
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Display face for headings, numerals and primary actions */
+  .streak-flame .count, .bubble-title, .lesson-name, .lesson-action,
+  .bubble-btn, .sheet-nav .title, .empty-state .title, .group-title,
+  .node-label, .node-pos { font-family: var(--font-display); }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  /* ── Header ───────────────────────────── */
+  #header {
+    flex: 0 0 auto;
+    display: flex; align-items: center; gap: 12px;
+    padding: max(env(safe-area-inset-top), 10px) 20px 12px;
+    border-bottom: 0.5px solid var(--separator);
+    background: var(--bg);
+  }
+  .streak-flame {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 23px; font-weight: 800;
+  }
+  .streak-flame .icon { width: 23px; height: 23px; display: block; color: var(--text-tertiary); transition: color .3s; }
+  .streak-flame .icon svg { width: 100%; height: 100%; }
+  .g-flame { fill: none; stroke: currentColor; stroke-width: 1.7; transition: fill .3s; }
+  .streak-flame.met .icon { color: var(--orange); }
+  .streak-flame.met .g-flame { fill: var(--orange); }
+  .streak-flame .count { color: var(--text-secondary); transition: color .3s; letter-spacing: -0.5px; }
+  .streak-flame.met .count { color: var(--orange); }
+  .spacer { flex: 1; }
+  .shields { display: flex; gap: 5px; }
+  .shield { width: 22px; height: 22px; display: block; }
+  .shield svg { width: 100%; height: 100%; }
+  .g-shield .sh-body { fill: none; stroke: var(--text-tertiary); stroke-width: 1.6; }
+  .g-shield .sh-mark { stroke: var(--text-tertiary); stroke-width: 1.4; fill: none; opacity: 0; }
+  .shield.full .g-shield .sh-body { fill: color-mix(in srgb, var(--frost) 24%, transparent); stroke: var(--frost); }
+  .shield.full .g-shield .sh-mark { stroke: var(--frost); opacity: 1; }
+  .best { font-size: 11px; font-weight: 700; letter-spacing: 0.7px; color: var(--text-tertiary); }
+  .settings-btn {
+    width: 34px; height: 34px; border-radius: 50%; flex: 0 0 auto;
+    display: grid; place-items: center;
+    color: var(--text-secondary); background: var(--bg-elev2);
+  }
+  .settings-btn svg { width: 20px; height: 20px; }
+  .settings-btn:active { transform: scale(.9); }
+  .list-btn { width: 100%; text-align: left; padding: 13px 16px; font-size: 17px; color: var(--accent); }
+  .list-btn + .list-btn { border-top: 0.5px solid var(--separator); }
+  .stat { font-size: 17px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  /* ── Trail ────────────────────────────── */
+  #trail {
+    position: relative;
+    flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 20px 0 130px;
+  }
+  #trail.empty { display: flex; align-items: center; justify-content: center; }
+
+  .empty-state {
+    text-align: center; color: var(--text-secondary);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding-bottom: 80px;
+  }
+  .empty-state .big { font-size: 64px; opacity: .5; }
+  .empty-state .title { font-size: 20px; font-weight: 700; color: var(--text); }
+  .empty-state .sub { font-size: 16px; max-width: 240px; }
+
+  .group-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 28px 24px 6px;
+  }
+  .group-header .col { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+  .group-header .name {
+    font-size: 12px; font-weight: 700; letter-spacing: 1.4px;
+    color: var(--text-secondary); text-transform: uppercase;
+  }
+  .group-header .bar { height: 5px; border-radius: 3px; background: var(--text-tertiary); position: relative; overflow: hidden; }
+  .group-header .bar > span {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px;
+    background: var(--accent); transition: width .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .group-header .frac { font-size: 12px; font-weight: 700; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .group-header .frac.done { color: var(--green); }
+
+  .node-row {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 14px 0; position: relative;
+    transition: transform .35s cubic-bezier(.34,1.3,.64,1);
+    touch-action: pan-y;
+  }
+  .node {
+    position: relative; width: var(--node); height: var(--node);
+    display: grid; place-items: center;
+  }
+  .node.group { width: 84px; height: 84px; }
+  .node .ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); z-index: 0; }
+  .node .ring circle { transition: stroke-dashoffset .45s cubic-bezier(.34,1.3,.64,1); }
+  .node .ring .ring-track { stroke: var(--ring-track); }
+  .node .shadow {
+    position: absolute; top: 50%; left: 50%;
+    width: var(--node); height: var(--node); border-radius: 50%;
+    transform: translate(-50%, calc(-50% + 5px));
+  }
+  .node .face {
+    position: relative; z-index: 1; width: var(--node); height: var(--node); border-radius: 50%;
+    display: grid; place-items: center;
+    box-shadow: 0 2px 3px var(--shadow);
+    transition: transform .15s ease;
+    font-size: 28px;
+  }
+  .node:active .face { transform: scale(.92); }
+  .node .face .check { width: 28px; height: 28px; }
+  .node .face .lock { font-size: 22px; opacity: .55; color: #fff; }
+
+  .node-row.completed .face { background: var(--green); }
+  .node-row.completed .shadow { background: var(--green-dark); }
+  .node-row.locked .face { background: var(--gray); }
+  .node-row.locked .shadow { background: var(--gray-dark); }
+  .node-row.live .face { background: var(--orange); }
+  .node-row.live .shadow { background: var(--orange-dark); }
+  .node-row.gold .face { background: var(--gold); }
+  .node-row.gold .shadow { background: var(--gold-dark); }
+
+  .node-row.live:not(.completed):not(.locked) .face { animation: pulse .85s ease-in-out infinite alternate; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.07); } }
+
+  .node-label {
+    font-size: 12px; font-weight: 700; text-align: center;
+    max-width: 92px; line-height: 1.2;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .node-row.locked .node-label { color: var(--text-secondary); }
+  .node-time { font-size: 11px; color: var(--text-secondary); }
+  .node-row.live .node-time { color: var(--orange); }
+  .node-pos { font-size: 11px; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+  .node-sub { font-size: 12px; color: var(--text-secondary); max-width: 110px; text-align: center; line-height: 1.2;
+    display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* Group manager rows */
+  .check { width: 26px; height: 26px; flex: 0 0 auto; border-radius: 50%;
+    border: 2px solid var(--separator); background: none; display: grid; place-items: center;
+    font-size: 14px; color: #fff; }
+  .check.on { background: var(--green); border-color: var(--green); }
+  .edit-link { flex: 0 0 auto; color: var(--accent); font-size: 15px; padding: 4px 2px; }
+  .grow-empty { padding: 14px 16px; color: var(--text-secondary); font-size: 14px; text-align: center; }
+
+  /* ── FAB ──────────────────────────────── */
+  #fab {
+    position: fixed; right: 24px; bottom: max(env(safe-area-inset-bottom), 24px);
+    width: 58px; height: 58px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center;
+    font-size: 28px; font-weight: 300;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.25);
+    z-index: 30;
+  }
+  #fab:active { transform: scale(.92); }
+
+  /* ── Toast ────────────────────────────── */
+  #toast {
+    position: fixed; left: 50%; bottom: 120px; transform: translate(-50%, 20px);
+    background: color-mix(in srgb, var(--bg-elev) 80%, transparent);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    border: 0.5px solid var(--separator);
+    padding: 11px 22px; border-radius: 100px;
+    font-size: 15px; font-weight: 700;
+    opacity: 0; pointer-events: none; transition: all .35s cubic-bezier(.34,1.4,.64,1);
+    z-index: 40; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ── Confetti ─────────────────────────── */
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 200; overflow: hidden; }
+  .confetti-piece { position: absolute; left: 50%; top: 50%; border-radius: 2px; will-change: transform, opacity; }
+
+  /* ── Modal / Sheet ────────────────────── */
+  #sheet-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    opacity: 0; pointer-events: none; transition: opacity .3s; z-index: 100;
+  }
+  #sheet-backdrop.show { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    max-height: 92dvh; background: var(--bg-grouped);
+    border-radius: 14px 14px 0 0;
+    transform: translateY(100%); transition: transform .32s cubic-bezier(.32,.72,0,1);
+    z-index: 101; display: flex; flex-direction: column;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sheet.show { transform: translateY(0); }
+  .sheet-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; flex: 0 0 auto;
+  }
+  .sheet-nav .title { font-size: 17px; font-weight: 700; }
+  .sheet-nav button { font-size: 17px; color: var(--accent); padding: 4px 2px; }
+  .sheet-nav button.save { font-weight: 700; }
+  .sheet-nav button:disabled { color: var(--text-tertiary); }
+  .sheet-body { overflow-y: auto; padding: 0 0 24px; }
+
+  .form-section { margin: 18px 16px 0; }
+  .form-section > .label {
+    font-size: 13px; color: var(--text-secondary);
+    text-transform: uppercase; padding: 0 16px 6px; letter-spacing: .3px;
+  }
+  .form-section > .footer { font-size: 12px; color: var(--text-secondary); padding: 6px 16px 0; }
+  .card { background: var(--bg-elev); border-radius: 10px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; min-height: 44px; }
+  .row + .row { border-top: 0.5px solid var(--separator); }
+  .emoji-btn {
+    width: 48px; height: 48px; flex: 0 0 auto; font-size: 30px;
+    background: var(--bg-elev2); border-radius: 10px; display: grid; place-items: center;
+  }
+  .row input[type=text] {
+    flex: 1; border: none; background: none; color: var(--text);
+    font-size: 17px; outline: none; min-width: 0;
+  }
+  .row input[type=time] {
+    border: none; background: var(--bg-elev2); color: var(--text);
+    font-size: 16px; border-radius: 8px; padding: 6px 10px; outline: none;
+  }
+  .row .row-label { flex: 1; font-size: 17px; }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 4px 16px 10px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: 0 0 auto; font-size: 12px; font-weight: 700;
+    padding: 6px 12px; border-radius: 100px;
+    background: var(--bg-elev3); color: var(--text);
+  }
+  .chip.sel { background: var(--accent); color: #fff; }
+  .delete-btn { width: 100%; text-align: center; color: #ff3b30; font-size: 17px; padding: 12px; background: var(--bg-elev); border-radius: 10px; }
+
+  /* iOS-style toggle */
+  .toggle { position: relative; width: 51px; height: 31px; flex: 0 0 auto; }
+  .toggle input { display: none; }
+  .toggle .track {
+    position: absolute; inset: 0; border-radius: 100px; background: var(--gray);
+    transition: background .25s;
+  }
+  .toggle .knob {
+    position: absolute; top: 2px; left: 2px; width: 27px; height: 27px;
+    border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.25);
+    transition: transform .25s;
+  }
+  .toggle input:checked + .track { background: var(--green); }
+  .toggle input:checked + .track + .knob { transform: translateX(20px); }
+
+  /* Emoji picker grid */
+  .emoji-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; padding: 16px; }
+  .emoji-cell {
+    height: 50px; font-size: 30px; border-radius: 10px; display: grid; place-items: center;
+    border: 2px solid transparent;
+  }
+  .emoji-cell.sel { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+
+  .row textarea {
+    flex: 1; border: none; background: none; color: var(--text); font-size: 16px;
+    outline: none; resize: none; font-family: inherit; min-width: 0; line-height: 1.35; padding: 2px 0;
+  }
+
+  /* ── Tap bubble (Duolingo "start" popover) ── */
+  #bubble-backdrop { position: fixed; inset: 0; z-index: 60; }
+  .bubble {
+    position: fixed; z-index: 61; width: 230px; max-width: 78vw;
+    background: var(--bg-elev); border-radius: 16px; padding: 16px;
+    box-shadow: 0 12px 34px rgba(0,0,0,.38); border: 0.5px solid var(--separator);
+    text-align: center; transform-origin: center bottom;
+    animation: bubblePop .22s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes bubblePop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .bubble-title { font-size: 18px; font-weight: 800; }
+  .bubble-sub { font-size: 13px; color: var(--text-secondary); margin-top: 3px; line-height: 1.3; }
+  .bubble-btn {
+    margin-top: 13px; width: 100%; padding: 12px; border-radius: 12px;
+    font-size: 15px; font-weight: 800; letter-spacing: .6px; color: #fff;
+    background: var(--green); box-shadow: 0 3px 0 var(--green-dark);
+  }
+  .bubble-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--green-dark); }
+  .bubble-btn.undo { background: var(--bg-elev3); color: var(--text); box-shadow: 0 3px 0 rgba(0,0,0,.22); }
+  .bubble-link { margin-top: 10px; font-size: 13px; color: var(--accent); }
+  .bubble-arrow {
+    position: absolute; width: 14px; height: 14px; background: var(--bg-elev);
+    border-right: 0.5px solid var(--separator); border-bottom: 0.5px solid var(--separator);
+    bottom: -7px; transform: rotate(45deg);
+  }
+  .bubble.below .bubble-arrow { bottom: auto; top: -7px; transform: rotate(225deg); }
+
+  /* ── Lesson overlay ── */
+  .lesson {
+    position: fixed; inset: 0; z-index: 120; background: var(--bg);
+    display: flex; flex-direction: column;
+    padding: max(env(safe-area-inset-top),14px) 18px max(env(safe-area-inset-bottom),18px);
+    opacity: 0; pointer-events: none; transform: scale(.98);
+    transition: opacity .25s, transform .25s;
+  }
+  .lesson.show { opacity: 1; pointer-events: auto; transform: scale(1); }
+  .lesson-top { display: flex; align-items: center; gap: 14px; flex: 0 0 auto; }
+  .lesson-quit { font-size: 22px; color: var(--text-secondary); width: 32px; height: 32px; flex: 0 0 auto; }
+  .lesson-progress { flex: 1; height: 16px; border-radius: 100px; background: var(--bg-elev3); overflow: hidden; }
+  .lesson-progress > span { display: block; height: 100%; width: 0; border-radius: 100px; background: var(--green); transition: width .5s cubic-bezier(.34,1.3,.64,1); }
+  .lesson-stage { position: relative; flex: 1; overflow: hidden; }
+  .lesson-card {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 18px; padding: 16px; text-align: center;
+    transition: transform .36s cubic-bezier(.32,.72,0,1), opacity .36s;
+  }
+  .lesson-card.in { transform: translateX(60%); opacity: 0; }
+  .lesson-card.out { transform: translateX(-60%); opacity: 0; }
+  .lesson-emoji { font-size: 88px; line-height: 1; }
+  .lesson-card.finale .lesson-emoji { animation: finalePop .65s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes finalePop { 0% { transform: scale(.3) rotate(-12deg); } 60% { transform: scale(1.18) rotate(7deg); } 100% { transform: scale(1) rotate(0); } }
+  .lesson-name { font-size: 27px; font-weight: 800; }
+  .lesson-desc { font-size: 16px; color: var(--text-secondary); max-width: 330px; line-height: 1.45; white-space: pre-line; }
+  .lesson-bottom { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .lesson-congrats {
+    font-size: 18px; font-weight: 800; color: var(--green); text-align: center; min-height: 26px;
+    opacity: 0; transform: translateY(8px); transition: opacity .3s, transform .3s;
+  }
+  .lesson-congrats.show { opacity: 1; transform: translateY(0); }
+  .lesson-action {
+    width: 100%; padding: 16px; border-radius: 14px; font-size: 17px; font-weight: 800; letter-spacing: .6px;
+    color: #fff; background: var(--green); box-shadow: 0 4px 0 var(--green-dark);
+  }
+  .lesson-action:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--green-dark); }
+  .lesson-action.continue { background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
+
+  /* ── Icon rendering ── */
+  .ic { width: 28px; height: 28px; display: block; }
+  .ic-emoji { font-size: 26px; line-height: 1; }
+  #fab svg { width: 26px; height: 26px; }
+  .node .face { color: #fff; }
+  .node .face .node-ic { width: 30px; height: 30px; }
+  .node .face .check { width: 30px; height: 30px; }
+  .emoji-btn .pick-lg { width: 28px; height: 28px; color: var(--text); }
+  .emoji-cell .pick-ic { width: 28px; height: 28px; color: var(--text); }
+  .row-ic-wrap { width: 30px; height: 30px; flex: 0 0 auto; display: grid; place-items: center; color: var(--text-secondary); }
+  .row-ic { width: 24px; height: 24px; }
+  .check svg { width: 16px; height: 16px; color: #fff; }
+  .list-btn.accent { color: var(--accent); font-weight: 700; }
+
+  /* ── Trail connector (signature) ── */
+  #trail-path { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; }
+  #trail-path .tp-faint { fill: none; stroke: var(--ring-track); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 0.5 11; }
+  #trail-path .tp-solid { fill: none; stroke: var(--green); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+  .node-row { z-index: 1; }
+
+  /* ── Lesson coin ── */
+  .lesson-coin {
+    width: 118px; height: 118px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--gold); color: #fff;
+    box-shadow: 0 9px 0 var(--gold-dark), 0 18px 30px var(--shadow);
+  }
+  .lesson-coin .coin-ic { width: 54px; height: 54px; }
+  .lesson-coin .check { width: 56px; height: 56px; }
+  .lesson-coin.done { background: var(--green); box-shadow: 0 9px 0 var(--green-dark), 0 18px 30px var(--shadow); }
+  .lesson-card.finale .lesson-coin { animation: finalePop .65s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ── Empty state ── */
+  .empty-art { width: 210px; max-width: 72%; height: auto; margin-bottom: 4px; }
+
+  /* ── Group edit mode ── */
+  #group-edit-toggle { font-size: 17px; color: var(--accent); padding: 4px 2px; }
+  .row-meta { color: var(--text-tertiary); font-size: 13px; font-weight: 400; }
+  .grow-edit { gap: 8px; }
+  .reorder { display: flex; flex-direction: column; gap: 2px; flex: 0 0 auto; }
+  .rbtn { width: 30px; height: 22px; display: grid; place-items: center; color: var(--text-secondary); border-radius: 6px; }
+  .rbtn svg { width: 18px; height: 18px; }
+  .rbtn:disabled { color: var(--text-tertiary); opacity: .4; }
+  .rbtn:not(:disabled):active { background: var(--bg-elev2); }
+  .icon-btn { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; color: var(--text-secondary); border-radius: 8px; }
+  .icon-btn svg { width: 20px; height: 20px; }
+  .icon-btn:active { background: var(--bg-elev2); }
+  .icon-btn.danger { color: #d9533b; }
+  .grow-edit .row-label { font-weight: 600; }
+
+  /* ── Copy dialog ── */
+  #dialog-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 110; }
+  .mini-dialog {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 300px; max-width: 86vw; z-index: 111;
+    background: var(--bg-grouped); border-radius: 18px; padding: 22px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.4); text-align: center;
+    animation: bubblePop .2s cubic-bezier(.34,1.56,.64,1);
+  }
+  .md-title { font-family: var(--font-display); font-size: 19px; font-weight: 800; }
+  .md-sub { font-size: 14px; color: var(--text-secondary); margin-top: 6px; line-height: 1.35; }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 18px 0; }
+  .step-btn {
+    width: 46px; height: 46px; border-radius: 50%; font-size: 26px; font-weight: 700;
+    background: var(--bg-elev3); color: var(--text); display: grid; place-items: center; line-height: 1;
+  }
+  .step-btn:active { transform: scale(.92); }
+  .step-val { font-family: var(--font-display); font-size: 30px; font-weight: 800; min-width: 40px; }
+  .md-actions { display: flex; gap: 10px; }
+  .md-actions button { flex: 1; padding: 12px; border-radius: 12px; font-size: 15px; font-weight: 700; background: var(--bg-elev3); color: var(--text); }
+  .md-actions .primary { background: var(--accent); color: #fff; }
+  .md-actions button:active { transform: translateY(1px); }
+
+  /* ── Timer field ── */
+  .dur { display: inline-flex; align-items: baseline; gap: 4px; }
+  .dur input { width: 52px; background: var(--bg-elev2); color: var(--text); border: none; border-radius: 8px; padding: 7px 8px; font-size: 16px; text-align: center; outline: none; font-family: var(--font-ui); }
+  .dur-unit { font-size: 13px; color: var(--text-secondary); }
+  #timer-row { gap: 14px; }
+
+  /* ── Lesson countdown ── */
+  .lesson-timer {
+    font-family: var(--font-display); font-size: 46px; font-weight: 800;
+    font-variant-numeric: tabular-nums; letter-spacing: 1px; margin-top: 6px;
+    color: var(--text); transition: color .2s;
+  }
+  .lesson-timer.running { color: var(--accent); }
+  .lesson-action.start { background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
+  .lesson-action.skip { background: var(--bg-elev3); color: var(--text); box-shadow: 0 4px 0 rgba(0,0,0,.18); }
+</style>
+</head>
+<body>
+  <div id="header">
+    <div class="streak-flame" id="flame">
+      <span class="icon" id="flame-icon"></span><span class="count">0</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="shields" id="shields"></div>
+    <div class="best" id="best">BEST 0</div>
+    <button class="settings-btn" id="settings-btn" aria-label="Settings"></button>
+  </div>
+
+  <div id="trail"></div>
+
+  <button id="fab" aria-label="Add task"></button>
+
+  <div id="toast"></div>
+  <div id="confetti"></div>
+
+  <!-- Add / Edit sheet -->
+  <div id="sheet-backdrop"></div>
+  <div class="sheet" id="edit-sheet">
+    <div class="sheet-nav">
+      <button id="edit-cancel">Cancel</button>
+      <span class="title" id="edit-title">New Task</span>
+      <button class="save" id="edit-save">Save</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-section">
+        <div class="label">Task</div>
+        <div class="card">
+          <div class="row">
+            <button class="emoji-btn" id="emoji-btn">⭐️</button>
+            <input type="text" id="name-input" placeholder="Task name" autocomplete="off" />
+          </div>
+          <div class="row">
+            <textarea id="desc-input" placeholder="Description (optional)" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="label">Group</div>
+        <div class="card">
+          <div class="row">
+            <input type="text" id="group-input" placeholder="Group name (optional)" autocomplete="off" autocapitalize="words" />
+          </div>
+        </div>
+        <div class="chips" id="group-chips"></div>
+        <div class="footer">Tasks in the same group are sequential — each unlocks when the previous is done.</div>
+      </div>
+
+      <div class="form-section">
+        <div class="label">Due time</div>
+        <div class="card">
+          <div class="row">
+            <span class="row-label">Set a due time</span>
+            <label class="toggle">
+              <input type="checkbox" id="due-toggle" />
+              <span class="track"></span><span class="knob"></span>
+            </label>
+          </div>
+          <div class="row" id="due-time-row" style="display:none">
+            <span class="row-label">Time</span>
+            <input type="time" id="due-input" value="09:00" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="label">Timer</div>
+        <div class="card">
+          <div class="row">
+            <span class="row-label">Timed task</span>
+            <label class="toggle">
+              <input type="checkbox" id="timer-toggle" />
+              <span class="track"></span><span class="knob"></span>
+            </label>
+          </div>
+          <div class="row" id="timer-row" style="display:none">
+            <span class="row-label">Length</span>
+            <span class="dur"><input type="number" id="timer-min" min="0" max="180" value="2" /><span class="dur-unit">min</span></span>
+            <span class="dur"><input type="number" id="timer-sec" min="0" max="59" value="0" /><span class="dur-unit">sec</span></span>
+          </div>
+        </div>
+        <div class="footer">A timed task shows a Start button in its lesson, counts down, and plays a sound when it starts and finishes.</div>
+      </div>
+
+      <div class="form-section" id="delete-section" style="display:none">
+        <button class="delete-btn" id="delete-btn">Delete Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Emoji picker sheet -->
+  <div class="sheet" id="emoji-sheet">
+    <div class="sheet-nav">
+      <button id="emoji-cancel">Cancel</button>
+      <span class="title">Choose icon</span>
+      <span style="width:52px"></span>
+    </div>
+    <div class="sheet-body">
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+  </div>
+
+  <!-- Settings sheet -->
+  <div class="sheet" id="settings-sheet">
+    <div class="sheet-nav">
+      <button id="settings-close">Done</button>
+      <span class="title">Settings</span>
+      <span style="width:52px"></span>
+    </div>
+    <div class="sheet-body">
+      <div class="form-section">
+        <div class="label">Backup</div>
+        <div class="card">
+          <button class="list-btn" id="export-btn">Export backup (.json)</button>
+          <button class="list-btn" id="import-btn">Import backup…</button>
+        </div>
+        <div class="footer">Your tasks and streaks live only on this device. Export a backup now and then so nothing is lost if you clear Safari data or move to a new phone.</div>
+      </div>
+
+      <div class="form-section">
+        <div class="label">Stats</div>
+        <div class="card">
+          <div class="row"><span class="row-label">Current streak</span><span class="stat" id="stat-cur">0</span></div>
+          <div class="row"><span class="row-label">Longest streak</span><span class="stat" id="stat-best">0</span></div>
+          <div class="row"><span class="row-label">Freezes available</span><span class="stat" id="stat-freeze">0</span></div>
+          <div class="row"><span class="row-label">Tasks</span><span class="stat" id="stat-tasks">0</span></div>
+          <div class="row"><span class="row-label">Active days</span><span class="stat" id="stat-days">0</span></div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <button class="delete-btn" id="reset-btn">Reset all data</button>
+      </div>
+    </div>
+    <input type="file" id="import-file" accept="application/json,.json" style="display:none" />
+  </div>
+
+  <!-- Tap bubble -->
+  <div id="bubble-backdrop" style="display:none"></div>
+  <div id="bubble" class="bubble" style="display:none">
+    <div class="bubble-title" id="bubble-title"></div>
+    <div class="bubble-sub" id="bubble-sub"></div>
+    <button class="bubble-btn" id="bubble-btn">START</button>
+    <button class="bubble-link" id="bubble-link" style="display:none"></button>
+    <div class="bubble-arrow" id="bubble-arrow"></div>
+  </div>
+
+  <!-- Lesson overlay -->
+  <div class="lesson" id="lesson">
+    <div class="lesson-top">
+      <button class="lesson-quit" id="lesson-quit" aria-label="Quit">✕</button>
+      <div class="lesson-progress"><span id="lesson-fill"></span></div>
+    </div>
+    <div class="lesson-stage" id="lesson-stage"></div>
+    <div class="lesson-bottom">
+      <div class="lesson-congrats" id="lesson-congrats"></div>
+      <button class="lesson-action" id="lesson-action">COMPLETE</button>
+    </div>
+  </div>
+
+  <!-- Group manager sheet -->
+  <div class="sheet" id="group-sheet">
+    <div class="sheet-nav">
+      <button id="group-close">Done</button>
+      <span class="title" id="group-title">Group</span>
+      <button id="group-edit-toggle">Edit</button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-section">
+        <div class="label" id="group-progress">0/0 done today</div>
+        <div class="card" id="group-task-list"></div>
+        <div class="footer" id="group-footer"></div>
+      </div>
+      <div class="form-section">
+        <div class="card">
+          <button class="list-btn accent" id="group-add-btn">Add step to this group</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Copy-count dialog -->
+  <div id="dialog-backdrop" style="display:none"></div>
+  <div id="copy-dialog" class="mini-dialog" style="display:none">
+    <div class="md-title">Duplicate step</div>
+    <div class="md-sub" id="copy-sub"></div>
+    <div class="stepper">
+      <button class="step-btn" id="copy-minus" aria-label="Fewer">–</button>
+      <span class="step-val" id="copy-count">1</span>
+      <button class="step-btn" id="copy-plus" aria-label="More">+</button>
+    </div>
+    <div class="md-actions">
+      <button id="copy-cancel">Cancel</button>
+      <button id="copy-confirm" class="primary">Add copies</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+
+// ─────────────────────────────────────────────────────────────
+// Persistence
+// ─────────────────────────────────────────────────────────────
+const KEY = "tasktrail.v1";
+const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-" + Math.random().toString(36).slice(2) + Date.now());
+
+let db = load();
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return {
+    tasks: [],
+    completions: [],
+    appState: { currentStreak: 0, longestStreak: 0, lastCompletedDay: null, freezeCount: 0, lastFreezeRefillDate: null },
+  };
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+
+// ─────────────────────────────────────────────────────────────
+// Date helpers — day keys are "YYYY-MM-DD" in local time (≈ startOfDay)
+// ─────────────────────────────────────────────────────────────
+const pad = (n) => String(n).padStart(2, "0");
+const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayKey = () => dateKey(new Date());
+function parseKey(k) { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); }
+function addDaysKey(k, n) { const d = parseKey(k); d.setDate(d.getDate() + n); return dateKey(d); }
+function daysBetween(a, b) { return Math.round((parseKey(b) - parseKey(a)) / 86400000); }
+
+// ─────────────────────────────────────────────────────────────
+// Task helpers
+// ─────────────────────────────────────────────────────────────
+function doneToday(task) {
+  const t = todayKey();
+  return db.completions.some((c) => c.taskID === task.id && c.dateCompleted === t);
+}
+function dueDateToday(task) {
+  if (!task.hasDueTime || !task.dueTime) return null;
+  const [h, m] = task.dueTime.split(":").map(Number);
+  const d = new Date(); d.setHours(h, m, 0, 0); return d;
+}
+function isLive(task) {
+  const due = dueDateToday(task);
+  if (!due) return false;
+  return Date.now() >= due.getTime() - 3600 * 1000;
+}
+function timeLabel(task) {
+  const due = dueDateToday(task);
+  if (!due) return "";
+  return due.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+function formatTime(s) {
+  s = Math.max(0, Math.round(s));
+  return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+}
+
+// ─────────────────────────────────────────────────────────────
+// StreakEngine  (faithful port of StreakEngine.swift)
+// ─────────────────────────────────────────────────────────────
+const StreakEngine = {
+  auditOnLaunch() {
+    this.refillFreezeIfEligible();
+    this.penaliseMissedDays();
+  },
+
+  allTasksDoneToday(extra) {
+    if (db.tasks.length === 0) return false;
+    const t = todayKey();
+    const comps = extra ? db.completions.concat(extra) : db.completions;
+    return db.tasks.every((task) =>
+      comps.some((c) => c.taskID === task.id && c.dateCompleted === t)
+    );
+  },
+
+  evaluateAfterToggle(extra) {
+    const s = db.appState;
+    if (!this.allTasksDoneToday(extra)) return;
+    const today = todayKey();
+
+    if (s.lastCompletedDay === today) return; // already credited today
+
+    const wasConsecutive = s.lastCompletedDay
+      ? s.lastCompletedDay === addDaysKey(today, -1)
+      : false;
+
+    if (wasConsecutive || s.lastCompletedDay === null) {
+      s.currentStreak += 1;
+    } else {
+      s.currentStreak = 1;
+    }
+    if (s.currentStreak > s.longestStreak) s.longestStreak = s.currentStreak;
+    s.lastCompletedDay = today;
+  },
+
+  refillFreezeIfEligible() {
+    const s = db.appState;
+    const today = todayKey();
+    if (s.lastFreezeRefillDate) {
+      if (daysBetween(s.lastFreezeRefillDate, today) < 7) return;
+    }
+    if (s.freezeCount < 2) s.freezeCount += 1;
+    s.lastFreezeRefillDate = today;
+  },
+
+  penaliseMissedDays() {
+    const s = db.appState;
+    if (db.tasks.length === 0) return;
+    if (!s.lastCompletedDay) return;
+    const today = todayKey();
+    if (daysBetween(s.lastCompletedDay, today) <= 0) return;
+
+    // Only days strictly BEFORE today can be "fully missed" — today is still in
+    // progress, so it never counts as a miss (this is the off-by-one that would
+    // otherwise wipe a live streak just by opening the app in the morning).
+    const daysToProcess = daysBetween(s.lastCompletedDay, today) - 1;
+
+    for (let i = 0; i < daysToProcess; i++) {
+      if (s.freezeCount > 0) {
+        s.freezeCount -= 1;
+        s.lastCompletedDay = addDaysKey(s.lastCompletedDay, 1);
+      } else {
+        s.currentStreak = 0;
+        s.lastCompletedDay = null;
+        return;
+      }
+    }
+  },
+};
+
+// ─────────────────────────────────────────────────────────────
+// TrailBuilder  (faithful port of TrailBuilder.swift)
+// ─────────────────────────────────────────────────────────────
+// Ordered list of units (a group with its tasks, or a standalone task).
+function buildUnits() {
+  const sorted = db.tasks.slice().sort((a, b) => a.sortOrder - b.sortOrder);
+  const groupUnits = {};
+  const groupOrder = [];
+  const standalone = [];
+  for (const task of sorted) {
+    const g = task.groupName || "";
+    if (g) {
+      if (!groupUnits[g]) { groupUnits[g] = { minSort: task.sortOrder, group: g, tasks: [] }; groupOrder.push(g); }
+      groupUnits[g].tasks.push(task);
+    } else {
+      standalone.push({ minSort: task.sortOrder, group: null, tasks: [task] });
+    }
+  }
+  let units = groupOrder.map((g) => groupUnits[g]).concat(standalone);
+  units.sort((a, b) => a.minSort - b.minSort);
+  return units;
+}
+
+// Renumber sortOrder to the canonical trail order, keeping each group's tasks
+// contiguous. Run once at launch (migration) and after any structural edit so
+// reorder/copy operate predictably.
+function normalizeOrder() {
+  let i = 0;
+  for (const u of buildUnits()) for (const t of u.tasks) t.sortOrder = i++;
+}
+
+// Move a step up/down within its group.
+function moveStep(id, dir) {
+  const t = db.tasks.find((x) => x.id === id);
+  if (!t) return;
+  const peers = db.tasks.filter((x) => x.groupName === t.groupName).sort((a, b) => a.sortOrder - b.sortOrder);
+  const idx = peers.findIndex((x) => x.id === id);
+  const j = idx + dir;
+  if (j < 0 || j >= peers.length) return;
+  const tmp = peers[idx].sortOrder; peers[idx].sortOrder = peers[j].sortOrder; peers[j].sortOrder = tmp;
+  save();
+}
+
+// Duplicate a step `count` times, inserting the copies right after it.
+function copyStep(id, count) {
+  const src = db.tasks.find((x) => x.id === id);
+  if (!src) return;
+  const flat = [];
+  for (const u of buildUnits()) for (const t of u.tasks) flat.push(t);
+  const idx = flat.findIndex((t) => t.id === id);
+  const copies = [];
+  for (let k = 0; k < count; k++) copies.push({ ...src, id: uid() });
+  flat.splice(idx + 1, 0, ...copies);
+  copies.forEach((c) => db.tasks.push(c));
+  flat.forEach((t, i) => { t.sortOrder = i; });
+  save();
+}
+
+function deleteStep(id) {
+  db.completions = db.completions.filter((c) => c.taskID !== id);
+  db.tasks = db.tasks.filter((t) => t.id !== id);
+  normalizeOrder();
+  save();
+}
+
+function buildTrail() {
+  const units = buildUnits();
+  const items = [];
+  let trailIndex = 0;
+  for (const unit of units) {
+    if (unit.group) {
+      // A group is ONE node. It shows its current (first-incomplete) task and
+      // advances as each is completed; it's "done" once every task is complete.
+      const tasks = unit.tasks; // already in sortOrder
+      const doneCount = tasks.filter(doneToday).length;
+      const active = tasks.find((t) => !doneToday(t)) || null;
+      items.push({
+        type: "node", kind: "group", nodeId: "group-" + unit.group,
+        group: unit.group, tasks, trailIndex,
+        activeTask: active, doneCount, total: tasks.length,
+        completed: doneCount === tasks.length, live: active ? isLive(active) : false,
+      });
+    } else {
+      const task = unit.tasks[0];
+      items.push({
+        type: "node", kind: "single", nodeId: "task-" + task.id,
+        task, trailIndex, completed: doneToday(task), live: isLive(task),
+      });
+    }
+    trailIndex++;
+  }
+  return items;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Rendering
+// ─────────────────────────────────────────────────────────────
+const AMPLITUDE = 84;
+const $ = (id) => document.getElementById(id);
+
+// ─────────────────────────────────────────────────────────────
+// Custom vector graphics (no emoji anywhere in the UI)
+// ─────────────────────────────────────────────────────────────
+const SVG_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">';
+const CHECK_SVG = `<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>`;
+
+function gFlame() {
+  return `<svg class="g-flame" viewBox="0 0 24 24" stroke-linejoin="round"><path d="M12 3.4c2.3 3.1 4.4 5.1 4.4 8.4a4.4 4.4 0 0 1-8.8 0c0-1.3.5-2.3 1.4-3.2.4 1.1 1.4 1.6 1.4 1.6-.3-3 .8-5.5 1.6-6.8z"/></svg>`;
+}
+function gShield() {
+  return `<svg class="g-shield" viewBox="0 0 24 24" stroke-linejoin="round" stroke-linecap="round"><path class="sh-body" d="M12 3l7 2.4v5.4c0 4.5-2.9 7.6-7 9.2-4.1-1.6-7-4.7-7-9.2V5.4L12 3z"/><path class="sh-mark" d="M9.5 11.5l2.5-1 2.5 1M9.5 14l2.5-1 2.5 1"/></svg>`;
+}
+function gSettings() {
+  return `${SVG_OPEN}<path d="M4 7h9M4 12h2M4 17h6"/><path d="M20 7h-2M20 12h-7M20 17h-4"/><circle cx="15.5" cy="7" r="2.2"/><circle cx="8.5" cy="12" r="2.2"/><circle cx="12.5" cy="17" r="2.2"/></svg>`;
+}
+function gPlus() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5.5v13M5.5 12h13"/></svg>`;
+}
+function gMedal() {
+  return `<svg class="g-medal" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.5 3l3.5 6 3.5-6" stroke="currentColor" stroke-width="1.8"/>
+    <circle cx="12" cy="15" r="6" fill="var(--gold)" stroke="var(--gold-dark)" stroke-width="1.6"/>
+    <path d="M9.4 15.2l1.8 1.8 3.4-3.4" stroke="#fff" stroke-width="2"/></svg>`;
+}
+function gChevron(dir) {
+  const d = dir === "up" ? "M6 14l6-6 6 6" : "M6 10l6 6 6-6";
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+}
+function gCopy() {
+  return `${SVG_OPEN}<rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 16V6a2 2 0 0 1 2-2h9"/></svg>`;
+}
+function gTrash() {
+  return `${SVG_OPEN}<path d="M5 7h14M10 7V5h4v2M8 7l1 12h6l1-12"/></svg>`;
+}
+function gTimer() {
+  return `${SVG_OPEN}<circle cx="12" cy="13.5" r="7"/><path d="M12 13.5V9.5M9.5 3.5h5"/></svg>`;
+}
+
+// Task icon set — one consistent line style
+const ICONS = {
+  water:'<path d="M12 3.5c3.6 4.6 5.6 7.2 5.6 10A5.6 5.6 0 0 1 6.4 13.5c0-2.8 2-5.4 5.6-10z"/>',
+  coffee:'<path d="M5 8.5h11.5V13a4.5 4.5 0 0 1-4.5 4.5H9.5A4.5 4.5 0 0 1 5 13V8.5z"/><path d="M16.5 9.5H18a2.5 2.5 0 0 1 0 5h-1.5"/><path d="M8 3.5v2M11 3.5v2"/>',
+  bottle:'<path d="M10 3.5h4v2.3l1.2 2v10.7a2 2 0 0 1-2 2h-2.4a2 2 0 0 1-2-2V7.8L10 5.8V3.5z"/><path d="M8.8 12h6.4"/>',
+  apple:'<path d="M12 8c-1.2-1.8-4.2-2.4-6 0-1.6 2.2-.7 6.4 1.4 9 1 1.2 1.8 1.5 2.6 1.5s1-.4 2-.4 1.2.4 2 .4 1.8-.3 2.6-1.5c2.1-2.6 3-6.8 1.4-9-1.8-2.4-4.8-1.8-6 0z"/><path d="M12 8c0-2.2 1.4-3.4 3.5-3.4"/>',
+  leaf:'<path d="M5 19C4 11 9.5 4.5 19.5 4.5c0 10-6.5 15.5-14.5 14.5z"/><path d="M9.5 14.5c2-3 5-5.5 8-6.5"/>',
+  run:'<path d="M13.6 3.6L11 11h4.6l-3.6 9.4 1.5-7.2H8.5l5.1-9.6z"/>',
+  dumbbell:'<path d="M4 9v6M6.5 7v10M17.5 7v10M20 9v6M6.5 12h11"/>',
+  bike:'<circle cx="6.5" cy="16" r="3.3"/><circle cx="17.5" cy="16" r="3.3"/><path d="M6.5 16l4-7.5h4.5l2.5 7.5M10.5 8.5L9 6h3.5"/>',
+  heart:'<path d="M12 20.4C6 16.9 3 13 3 9.4A4.3 4.3 0 0 1 12 7.1 4.3 4.3 0 0 1 21 9.4c0 3.6-3 7.5-9 11z"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.6v2.1M12 19.3v2.1M2.6 12h2.1M19.3 12h2.1M5.2 5.2l1.5 1.5M17.3 17.3l1.5 1.5M18.8 5.2l-1.5 1.5M6.7 17.3l-1.5 1.5"/>',
+  book:'<path d="M12 5.6C10.5 4.4 8.4 4.1 4.5 4.3V18c3.9-.2 6 .1 7.5 1.3 1.5-1.2 3.6-1.5 7.5-1.3V4.3C15.6 4.1 13.5 4.4 12 5.6z"/><path d="M12 5.6v13.7"/>',
+  pen:'<path d="M4 20l1-3.6L15.4 6l3.6 3.6L8.6 20 4 20z"/><path d="M14.4 7l3.6 3.6"/>',
+  laptop:'<rect x="4.5" y="6" width="15" height="9.5" rx="1.4"/><path d="M2.5 18.5h19"/>',
+  target:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.3"/>',
+  clock:'<circle cx="12" cy="12" r="8"/><path d="M12 7.6V12l3 2"/>',
+  home:'<path d="M4 11.4L12 5l8 6.4"/><path d="M6 10.2V19h12v-8.8"/><path d="M10.4 19v-4.4h3.2V19"/>',
+  plant:'<path d="M12 20.5v-7.5"/><path d="M12 13C12 9 9 6.5 4.5 6.5 4.5 11 7.5 13 12 13z"/><path d="M12 11.6c0-3.2 2.2-5.2 6.5-5.2 0 3.2-2.5 5.2-6.5 5.2z"/>',
+  paw:'<ellipse cx="8" cy="9" rx="1.5" ry="2"/><ellipse cx="12" cy="7.6" rx="1.5" ry="2"/><ellipse cx="16" cy="9" rx="1.5" ry="2"/><path d="M8.5 14.2c0-2 1.6-3.3 3.5-3.3s3.5 1.3 3.5 3.3-1.6 4-3.5 4-3.5-2-3.5-4z"/>',
+  sparkle:'<path d="M12 3.4l1.9 5.7 5.7 1.9-5.7 1.9L12 18.6l-1.9-5.7L4.4 11l5.7-1.9L12 3.4z"/>',
+  bell:'<path d="M6 16.4V11a6 6 0 0 1 12 0v5.4l1.6 1.9H4.4L6 16.4z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
+  mail:'<rect x="3.5" y="6" width="17" height="12" rx="2"/><path d="M4 8l8 5.5L20 8"/>',
+  key:'<circle cx="8" cy="8" r="3.5"/><path d="M10.5 10.5l8 8M16 16l2-2M14 14l2-2"/>',
+  music:'<path d="M9 17V6l9-1.8V14"/><circle cx="6.7" cy="17.4" r="2.3"/><circle cx="15.7" cy="14.4" r="2.3"/>',
+  brush:'<path d="M14.4 4.6l5 5L11.9 17l-2.5-2.5 7.5-7.4"/><path d="M9.4 14.5c-2.2.4-3 2.5-4.4 4 2-.3 4-.6 5.4-2.5"/>',
+  star:'<path d="M12 3.4l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17.5l-5.4 2.7 1-6.1L4.2 9.9l6.1-.9L12 3.4z"/>',
+  moon:'<path d="M20.5 13.6A8 8 0 1 1 10.4 3.5a6.5 6.5 0 0 0 10.1 10.1z"/>',
+  mountain:'<path d="M3 19l5.6-10 3.4 5 2.6-4L21 19z"/><path d="M8.6 9l2.1 3.6"/>',
+  flame:'<path d="M12 3.4c2.3 3.1 4.4 5.1 4.4 8.4a4.4 4.4 0 0 1-8.8 0c0-1.3.5-2.3 1.4-3.2.4 1.1 1.4 1.6 1.4 1.6-.3-3 .8-5.5 1.6-6.8z"/>',
+};
+const ICON_KEYS = Object.keys(ICONS);
+
+function iconMarkup(key, cls) {
+  const inner = ICONS[key];
+  if (inner) {
+    return `<svg class="ic ${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  }
+  return `<span class="ic-emoji ${cls || ''}">${esc(key || "")}</span>`; // legacy emoji fallback
+}
+
+function render() {
+  // Header
+  const goalMet = StreakEngine.allTasksDoneToday();
+  const s = db.appState;
+  const flame = $("flame");
+  flame.classList.toggle("met", goalMet);
+  flame.querySelector(".count").textContent = s.currentStreak;
+  $("flame-icon").innerHTML = gFlame();
+  $("settings-btn").innerHTML = gSettings();
+  $("best").textContent = "BEST " + s.longestStreak;
+  $("shields").innerHTML = [0, 1]
+    .map((i) => `<span class="shield ${i < s.freezeCount ? "full" : ""}">${gShield()}</span>`)
+    .join("");
+
+  // Trail
+  const trail = $("trail");
+  const items = buildTrail();
+  if (items.length === 0) {
+    trail.classList.add("empty");
+    trail.innerHTML = `<div class="empty-state">
+      <svg class="empty-art" viewBox="0 0 200 150" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="148" cy="40" r="16" stroke="var(--gold)" stroke-width="2.2" opacity=".7"/>
+        <path d="M8 124 L66 54 L96 92 L120 66 L192 124" stroke="var(--text-tertiary)" stroke-width="2.4"/>
+        <path d="M66 54 L78 70 M120 66 L130 80" stroke="var(--text-tertiary)" stroke-width="2.4"/>
+        <path class="empty-trail" d="M40 138 C70 128 60 108 92 104 C120 100 110 84 132 78" stroke="var(--accent)" stroke-width="2.6" stroke-dasharray="2 9"/>
+        <path d="M132 60 L132 80" stroke="var(--accent)" stroke-width="2.4"/>
+        <path d="M132 60 L146 65 L132 70 Z" fill="var(--accent)" stroke="var(--accent)" stroke-width="2"/>
+      </svg>
+      <div class="title">Your trail starts here</div>
+      <div class="sub">Add a daily task and it becomes the first waypoint on your trail.</div>
+    </div>`;
+    return;
+  }
+  trail.classList.remove("empty");
+  trail.innerHTML = items.map(renderItem).join("");
+  attachNodeHandlers();
+  drawTrailPath();
+}
+
+// Signature: a winding trail line linking the waypoints. The portion you've
+// already walked (up to your last completed node) is solid; the rest is faint.
+function drawTrailPath() {
+  const trail = $("trail");
+  const rows = [...trail.querySelectorAll(".node-row")];
+  const existing = $("trail-path");
+  if (existing) existing.remove();
+  if (rows.length < 2) return;
+
+  const base = trail.getBoundingClientRect();
+  const pts = rows.map((r) => {
+    const c = r.querySelector(".node").getBoundingClientRect();
+    return {
+      x: c.left + c.width / 2 - base.left + trail.scrollLeft,
+      y: c.top + c.height / 2 - base.top + trail.scrollTop,
+      done: r.classList.contains("completed"),
+    };
+  });
+
+  let lastDone = -1;
+  pts.forEach((p, i) => { if (p.done) lastDone = i; });
+
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.id = "trail-path";
+  svg.setAttribute("width", trail.clientWidth);
+  svg.setAttribute("height", trail.scrollHeight);
+
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  const faint = document.createElementNS(ns, "path");
+  faint.setAttribute("d", d);
+  faint.setAttribute("class", "tp-faint");
+  svg.appendChild(faint);
+
+  if (lastDone >= 1) {
+    const solidD = pts.slice(0, lastDone + 1)
+      .map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+    const solid = document.createElementNS(ns, "path");
+    solid.setAttribute("d", solidD);
+    solid.setAttribute("class", "tp-solid");
+    svg.appendChild(solid);
+  }
+  trail.insertBefore(svg, trail.firstChild);
+}
+
+const RING_CIRC = 289.03; // 2·π·46
+
+function renderItem(item) {
+  const x = Math.sin(item.trailIndex * Math.PI / 2) * AMPLITUDE;
+  return item.kind === "group" ? renderGroupNode(item, x) : renderSingleNode(item, x);
+}
+
+function renderSingleNode(item, x) {
+  const t = item.task;
+  let cls = "gold";
+  if (item.completed) cls = "completed";
+  else if (item.live) cls = "live";
+  const inner = item.completed ? CHECK_SVG : iconMarkup(t.emoji, "node-ic");
+  const time = timeLabel(t);
+  return `<div class="node-row ${cls}" style="transform:translateX(${x}px)" data-node="${item.nodeId}">
+    <div class="node">
+      <div class="shadow"></div>
+      <div class="face">${inner}</div>
+    </div>
+    <div class="node-label">${esc(t.name)}</div>
+    ${time ? `<div class="node-time">${esc(time)}</div>` : ""}
+  </div>`;
+}
+
+function renderGroupNode(item, x) {
+  const complete = item.completed;
+  const active = item.activeTask;
+  let cls = "group " + (complete ? "completed" : item.live ? "live" : "gold");
+  const inner = complete ? CHECK_SVG : active ? iconMarkup(active.emoji, "node-ic") : "";
+  const prog = item.total ? item.doneCount / item.total : 0;
+  const offset = RING_CIRC * (1 - prog);
+  const ringStroke = complete ? "var(--green)" : "var(--accent)";
+  const time = active ? timeLabel(active) : "";
+  const sub = complete ? "All done" : active ? esc(active.name) : "";
+  return `<div class="node-row ${cls}" style="transform:translateX(${x}px)" data-node="${item.nodeId}">
+    <div class="node group">
+      <svg class="ring" viewBox="0 0 100 100">
+        <circle class="ring-track" cx="50" cy="50" r="46" fill="none" stroke-width="7"/>
+        <circle cx="50" cy="50" r="46" fill="none" stroke="${ringStroke}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${RING_CIRC}" stroke-dashoffset="${offset}"/>
+      </svg>
+      <div class="shadow"></div>
+      <div class="face">${inner}</div>
+    </div>
+    <div class="node-label">${esc(item.group)}</div>
+    <div class="node-sub">${sub}</div>
+    ${time ? `<div class="node-time">${esc(time)}</div>` : ""}
+    <div class="node-pos">${item.doneCount}/${item.total}</div>
+  </div>`;
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+// Tap to toggle; long-press to edit. Uses Pointer Events so mouse, touch and pen
+// behave identically — no synthetic-mouse double-fire, and a scroll that starts on
+// a node never toggles it.
+function attachNodeHandlers() {
+  const byId = {};
+  buildTrail().forEach((i) => { byId[i.nodeId] = i; });
+
+  document.querySelectorAll(".node-row").forEach((el) => {
+    const item = byId[el.dataset.node];
+    if (!item) return;
+    let timer = null, longPressed = false, moved = false, sx = 0, sy = 0;
+    const clear = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+    el.addEventListener("pointerdown", (e) => {
+      longPressed = false; moved = false; sx = e.clientX; sy = e.clientY;
+      clear();
+      timer = setTimeout(() => { if (!moved) { longPressed = true; onNodeLongPress(item); } }, 500);
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) { moved = true; clear(); }
+    });
+    el.addEventListener("pointerup", () => {
+      clear();
+      if (longPressed || moved) return;
+      onNodeTap(item);
+    });
+    el.addEventListener("pointercancel", () => { clear(); moved = true; });
+  });
+}
+
+function onNodeTap(item) { openBubble(item); }
+
+function onNodeLongPress(item) {
+  if (item.kind === "single") openEdit(item.task);
+  else openGroup(item.group);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tap bubble → Start
+// ─────────────────────────────────────────────────────────────
+let bubbleItem = null;
+
+function openBubble(item) {
+  bubbleItem = item;
+  const b = $("bubble"), btn = $("bubble-btn"), link = $("bubble-link");
+  $("bubble-title").textContent = item.kind === "group" ? item.group : item.task.name;
+  link.style.display = "none";
+
+  if (item.completed) {
+    $("bubble-sub").textContent = "Completed today";
+    btn.className = "bubble-btn undo";
+    btn.textContent = item.kind === "group" ? "REVIEW STEPS" : "DONE";
+    link.style.display = "";
+    link.textContent = "Mark as not done";
+  } else {
+    btn.className = "bubble-btn";
+    btn.textContent = "START";
+    if (item.kind === "group") {
+      const left = item.total - item.doneCount;
+      $("bubble-sub").textContent = `${item.doneCount}/${item.total} done · ${left} step${left === 1 ? "" : "s"} to go`;
+    } else {
+      const t = item.task;
+      const base = (t.description || "").trim() || "Daily task";
+      $("bubble-sub").textContent = t.timerSec > 0 ? `${base} · ${formatTime(t.timerSec)} timer` : base;
+    }
+  }
+
+  $("bubble-backdrop").style.display = "block";
+  b.style.display = "block";
+  b.classList.remove("below");
+  positionBubble(item.nodeId);
+}
+
+function positionBubble(nodeId) {
+  const node = document.querySelector(`.node-row[data-node="${CSS.escape(nodeId)}"] .node`);
+  const b = $("bubble");
+  if (!node) { b.style.left = "50%"; b.style.top = "40%"; return; }
+  const r = node.getBoundingClientRect();
+  const bw = b.offsetWidth, bh = b.offsetHeight;
+  let left = Math.max(8, Math.min(r.left + r.width / 2 - bw / 2, window.innerWidth - bw - 8));
+  let top = r.top - bh - 12, below = false;
+  if (top < 64) { top = r.bottom + 12; below = true; }
+  b.style.left = left + "px";
+  b.style.top = top + "px";
+  b.classList.toggle("below", below);
+  const ax = r.left + r.width / 2 - left;
+  $("bubble-arrow").style.left = Math.max(12, Math.min(ax - 7, bw - 22)) + "px";
+}
+
+function closeBubble() {
+  $("bubble").style.display = "none";
+  $("bubble-backdrop").style.display = "none";
+  bubbleItem = null;
+}
+
+function bubbleAction() {
+  const item = bubbleItem;
+  if (!item) return;
+  if (item.completed) {
+    closeBubble();
+    if (item.kind === "group") openGroup(item.group);
+    return;
+  }
+  closeBubble();
+  openLesson(item);
+}
+
+function bubbleUndo() {
+  const item = bubbleItem;
+  if (!item) return;
+  const today = todayKey();
+  const ids = item.kind === "group" ? item.tasks.map((t) => t.id) : [item.task.id];
+  db.completions = db.completions.filter((c) => !(ids.includes(c.taskID) && c.dateCompleted === today));
+  save();
+  closeBubble();
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Audio cues (Web Audio — no files). Unlocked by the Start tap.
+// ─────────────────────────────────────────────────────────────
+let audioCtx = null;
+function ensureAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+  } catch (e) {}
+  return audioCtx;
+}
+function beep(freq, startAt, dur, type, gain) {
+  const c = audioCtx; if (!c) return;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type || "sine"; o.frequency.value = freq;
+  o.connect(g); g.connect(c.destination);
+  const t = c.currentTime + startAt;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain || 0.22, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+function playStartCue() { ensureAudio(); beep(880, 0, 0.2, "triangle", 0.25); }
+function playFinishCue() {
+  ensureAudio();
+  beep(660, 0, 0.16, "sine", 0.25);
+  beep(990, 0.16, 0.16, "sine", 0.25);
+  beep(1320, 0.32, 0.4, "sine", 0.28);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Lesson flow
+// ─────────────────────────────────────────────────────────────
+let lesson = null;
+const STEP_CONGRATS = ["Great job", "Nice one", "Done and dusted", "Keep it rolling", "Crushed it"];
+const FINALE_MSGS = ["You finished the trail", "Every step complete", "That's the whole route", "You showed up today"];
+
+function openLesson(item) {
+  const all = item.kind === "group" ? item.tasks.slice() : [item.task];
+  const pending = all.filter((t) => !doneToday(t));
+  if (pending.length === 0) { render(); return; }
+  lesson = { item, total: all.length, preDone: all.length - pending.length, steps: pending, index: 0, timerId: null };
+  $("lesson").classList.add("show");
+  updateLessonProgress(0);
+  presentStep(false);
+}
+
+// Show the current step and set the right action button (Start for timed steps).
+function presentStep(slide) {
+  stopTimer();
+  const step = lesson.steps[lesson.index];
+  $("lesson-congrats").classList.remove("show");
+  showStepCard(step, slide, false);
+  if (step.timerSec > 0) {
+    lesson.remaining = step.timerSec;
+    setLessonButton("START", "start", "timer-start");
+  } else {
+    setLessonButton("COMPLETE", "", "complete");
+  }
+}
+
+function showStepCard(task, slide, finale) {
+  const stage = $("lesson-stage");
+  const desc = (task.description || "").trim() || "Mark this step complete once you've done it.";
+  const coin = finale
+    ? `<div class="lesson-coin done">${CHECK_SVG}</div>`
+    : `<div class="lesson-coin">${iconMarkup(task.emoji, "coin-ic")}</div>`;
+  const timer = !finale && task.timerSec > 0
+    ? `<div class="lesson-timer" id="lesson-timer">${formatTime(task.timerSec)}</div>` : "";
+  const html = `<div class="lesson-card${finale ? " finale" : ""}">
+    ${coin}
+    <div class="lesson-name">${esc(task.name)}</div>
+    <div class="lesson-desc">${esc(desc)}</div>
+    ${timer}
+  </div>`;
+  if (slide) {
+    const old = stage.querySelector(".lesson-card");
+    if (old) { old.classList.add("out"); setTimeout(() => old.remove(), 400); }
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const card = tmp.firstElementChild;
+    card.classList.add("in");
+    stage.appendChild(card);
+    requestAnimationFrame(() => requestAnimationFrame(() => card.classList.remove("in")));
+  } else {
+    stage.innerHTML = html;
+  }
+}
+
+function updateLessonProgress(completedInSession) {
+  const done = lesson.preDone + completedInSession;
+  $("lesson-fill").style.width = (lesson.total ? (done / lesson.total) * 100 : 0) + "%";
+}
+
+function setLessonButton(text, cls, mode) {
+  const b = $("lesson-action");
+  b.textContent = text;
+  b.className = "lesson-action" + (cls ? " " + cls : "");
+  b.dataset.mode = mode || "complete";
+}
+
+function showCongrats(msg) {
+  const c = $("lesson-congrats");
+  c.textContent = msg;
+  c.classList.add("show");
+}
+
+// ── Timer ──
+function startTimer() {
+  playStartCue();
+  const el = $("lesson-timer");
+  setLessonButton("SKIP", "skip", "timer-skip");
+  if (el) el.classList.add("running");
+  lesson.timerId = setInterval(() => {
+    lesson.remaining -= 1;
+    const t = $("lesson-timer");
+    if (t) t.textContent = formatTime(Math.max(0, lesson.remaining));
+    if (lesson.remaining <= 0) {
+      stopTimer();
+      playFinishCue();
+      completeCurrentStep();
+    }
+  }, 1000);
+}
+function stopTimer() {
+  if (lesson && lesson.timerId) { clearInterval(lesson.timerId); lesson.timerId = null; }
+}
+
+function completeCurrentStep() {
+  stopTimer();
+  const task = lesson.steps[lesson.index];
+  const res = recordCompletion(task);
+  updateLessonProgress(lesson.index + 1);
+  const isLast = lesson.index >= lesson.steps.length - 1;
+  if (isLast) {
+    showStepCard(task, false, true); // celebratory coin
+    showCongrats(res.streakMsg || FINALE_MSGS[lesson.index % FINALE_MSGS.length]);
+    setLessonButton("FINISHED", "", "finish");
+    fireConfetti();
+  } else {
+    showCongrats(STEP_CONGRATS[lesson.index % STEP_CONGRATS.length]);
+    setLessonButton("CONTINUE", "continue", "continue");
+  }
+}
+
+function lessonAction() {
+  if (!lesson) return;
+  const mode = $("lesson-action").dataset.mode;
+  if (mode === "continue") { lesson.index++; presentStep(true); return; }
+  if (mode === "finish") { finishLesson(); return; }
+  if (mode === "timer-start") { startTimer(); return; }
+  if (mode === "timer-skip") { stopTimer(); completeCurrentStep(); return; }
+  completeCurrentStep(); // mode === "complete"
+}
+
+function finishLesson() {
+  stopTimer();
+  $("lesson").classList.remove("show");
+  lesson = null;
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Toggle completion
+// ─────────────────────────────────────────────────────────────
+// Add a completion for `task` (no-op if already done today). Runs the streak
+// engine and returns a streak message when this completion meets the daily goal.
+// Does NOT re-render or fire confetti — callers decide.
+function recordCompletion(task) {
+  const today = todayKey();
+  if (db.completions.some((c) => c.taskID === task.id && c.dateCompleted === today)) {
+    return { already: true, streakMsg: null };
+  }
+  const wasGoalMet = StreakEngine.allTasksDoneToday();
+  db.completions.push({ id: uid(), taskID: task.id, dateCompleted: today });
+  let streakMsg = null;
+  if (!wasGoalMet && StreakEngine.allTasksDoneToday()) {
+    const before = db.appState.currentStreak;
+    StreakEngine.evaluateAfterToggle();
+    streakMsg = db.appState.currentStreak > before
+      ? `${db.appState.currentStreak}-day streak`
+      : "All done today";
+  }
+  save();
+  return { already: false, streakMsg };
+}
+
+// Toggle a single task's completion (used by the group manager rows).
+function toggle(task) {
+  const today = todayKey();
+  const existing = db.completions.find((c) => c.taskID === task.id && c.dateCompleted === today);
+  if (existing) {
+    db.completions = db.completions.filter((c) => c !== existing);
+    save(); render();
+    return;
+  }
+  const res = recordCompletion(task);
+  if (res.streakMsg) showToast(res.streakMsg);
+  render();
+  fireConfetti();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Toast & Confetti
+// ─────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2500);
+}
+
+const PALETTE = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#0a84ff", "#af52de", "#ff2d55", "#32ade6", "#00c7be"];
+function fireConfetti() {
+  const root = $("confetti");
+  for (let i = 0; i < 60; i++) {
+    const base = (i / 60) * 2 * Math.PI;
+    const angle = base + (Math.random() * 0.36 - 0.18);
+    const radius = 90 + Math.random() * 180;
+    const tx = Math.cos(angle) * radius;
+    const ty = Math.sin(angle) * radius - 30;
+    const rot = Math.random() * 960 - 480;
+    const w = 6 + Math.random() * 4, h = 10 + Math.random() * 6;
+    const p = document.createElement("div");
+    p.className = "confetti-piece";
+    p.style.width = w + "px"; p.style.height = h + "px";
+    p.style.background = PALETTE[i % PALETTE.length];
+    p.style.transition = "transform .55s cubic-bezier(.2,.8,.3,1), opacity .45s ease-in .95s";
+    p.style.transform = "translate(-50%,-50%)";
+    root.appendChild(p);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      p.style.transform = `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) rotate(${rot}deg)`;
+      p.style.opacity = "0";
+    }));
+    setTimeout(() => p.remove(), 1600);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Add / Edit sheet
+// ─────────────────────────────────────────────────────────────
+let editing = null;   // task being edited, or null for new
+let pickedEmoji = "⭐️";
+
+function existingGroups() {
+  return [...new Set(db.tasks.map((t) => t.groupName).filter(Boolean))].sort();
+}
+
+function openAdd() {
+  editing = null;
+  pickedEmoji = "star";
+  $("edit-title").textContent = "New Task";
+  $("name-input").value = "";
+  $("desc-input").value = "";
+  $("group-input").value = "";
+  $("due-toggle").checked = false;
+  $("due-time-row").style.display = "none";
+  $("due-input").value = "09:00";
+  $("timer-toggle").checked = false;
+  $("timer-row").style.display = "none";
+  $("timer-min").value = 2;
+  $("timer-sec").value = 0;
+  $("emoji-btn").innerHTML = iconMarkup(pickedEmoji, "pick-lg");
+  $("delete-section").style.display = "none";
+  renderGroupChips();
+  validateSave();
+  showSheet("edit-sheet");
+  setTimeout(() => $("name-input").focus(), 320);
+}
+
+function openEdit(task) {
+  editing = task;
+  pickedEmoji = task.emoji;
+  $("edit-title").textContent = "Edit Task";
+  $("name-input").value = task.name;
+  $("desc-input").value = task.description || "";
+  $("group-input").value = task.groupName || "";
+  $("due-toggle").checked = task.hasDueTime;
+  $("due-time-row").style.display = task.hasDueTime ? "" : "none";
+  $("due-input").value = task.dueTime || "09:00";
+  const ts = task.timerSec || 0;
+  $("timer-toggle").checked = ts > 0;
+  $("timer-row").style.display = ts > 0 ? "" : "none";
+  $("timer-min").value = Math.floor(ts / 60);
+  $("timer-sec").value = ts % 60;
+  $("emoji-btn").innerHTML = iconMarkup(pickedEmoji, "pick-lg");
+  $("delete-section").style.display = "";
+  renderGroupChips();
+  validateSave();
+  showSheet("edit-sheet");
+}
+
+function renderGroupChips() {
+  const groups = existingGroups();
+  const cur = $("group-input").value.trim();
+  const chips = [{ label: "None", val: "" }, ...groups.map((g) => ({ label: g, val: g }))];
+  $("group-chips").innerHTML = chips
+    .map((c) => `<button class="chip ${c.val === cur ? "sel" : ""}" data-val="${esc(c.val)}">${esc(c.label)}</button>`)
+    .join("");
+  $("group-chips").querySelectorAll(".chip").forEach((el) => {
+    el.onclick = () => { $("group-input").value = el.dataset.val; renderGroupChips(); };
+  });
+}
+
+function validateSave() {
+  $("edit-save").disabled = $("name-input").value.trim() === "";
+}
+
+function saveTask() {
+  const name = $("name-input").value.trim();
+  if (!name) return;
+  const description = $("desc-input").value.trim();
+  const group = $("group-input").value.trim();
+  const hasDue = $("due-toggle").checked;
+  const dueTime = $("due-input").value || "09:00";
+  const timerSec = $("timer-toggle").checked
+    ? Math.max(0, (parseInt($("timer-min").value, 10) || 0) * 60 + (parseInt($("timer-sec").value, 10) || 0))
+    : 0;
+
+  if (editing) {
+    editing.name = name; editing.emoji = pickedEmoji; editing.groupName = group;
+    editing.description = description;
+    editing.hasDueTime = hasDue; editing.dueTime = dueTime; editing.timerSec = timerSec;
+  } else {
+    const maxOrder = db.tasks.reduce((m, t) => Math.max(m, t.sortOrder), -1);
+    db.tasks.push({ id: uid(), name, emoji: pickedEmoji, description, groupName: group, hasDueTime: hasDue, dueTime, timerSec, sortOrder: maxOrder + 1 });
+  }
+  normalizeOrder();
+  save();
+  hideSheet("edit-sheet");
+  render();
+}
+
+function deleteTask() {
+  if (!editing) return;
+  if (!confirm(`Delete "${editing.name}"?\nThis removes the task and all its history.`)) return;
+  db.completions = db.completions.filter((c) => c.taskID !== editing.id);
+  db.tasks = db.tasks.filter((t) => t !== editing);
+  save();
+  hideSheet("edit-sheet");
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Icon picker
+// ─────────────────────────────────────────────────────────────
+function openEmojiPicker() {
+  $("emoji-grid").innerHTML = ICON_KEYS
+    .map((k) => `<button class="emoji-cell ${k === pickedEmoji ? "sel" : ""}" data-e="${k}">${iconMarkup(k, "pick-ic")}</button>`)
+    .join("");
+  $("emoji-grid").querySelectorAll(".emoji-cell").forEach((el) => {
+    el.onclick = () => {
+      pickedEmoji = el.dataset.e;
+      $("emoji-btn").innerHTML = iconMarkup(pickedEmoji, "pick-lg");
+      hideSheet("emoji-sheet");
+    };
+  });
+  showSheet("emoji-sheet");
+}
+
+// ─────────────────────────────────────────────────────────────
+// Group manager (long-press a group node)
+// ─────────────────────────────────────────────────────────────
+let groupSheetName = "";
+let groupEditMode = false;
+
+function openGroup(name) {
+  groupSheetName = name;
+  groupEditMode = false;
+  renderGroupSheet();
+  showSheet("group-sheet");
+}
+
+function metaLabel(t) {
+  const bits = [];
+  if (t.hasDueTime) bits.push(esc(timeLabel(t)));
+  if (t.timerSec > 0) bits.push(formatTime(t.timerSec));
+  return bits.length ? ` · ${bits.join(" · ")}` : "";
+}
+
+function renderGroupSheet() {
+  const name = groupSheetName;
+  const tasks = db.tasks.filter((t) => t.groupName === name).sort((a, b) => a.sortOrder - b.sortOrder);
+  if (tasks.length === 0) { hideSheet("group-sheet"); render(); return; }
+  const done = tasks.filter(doneToday).length;
+  $("group-title").textContent = name;
+  $("group-edit-toggle").textContent = groupEditMode ? "Done" : "Edit";
+  $("group-progress").textContent = groupEditMode
+    ? `${tasks.length} step${tasks.length === 1 ? "" : "s"}`
+    : `${done}/${tasks.length} done today`;
+  $("group-footer").textContent = groupEditMode
+    ? "Reorder with the arrows, duplicate a step, or remove one. Tap a step to change its details."
+    : "Tap a step to mark it done. Tap Edit to reorder, copy, retime, or remove steps.";
+
+  $("group-task-list").innerHTML = tasks.map((t, i) => {
+    if (groupEditMode) {
+      return `<div class="row grow-edit">
+        <span class="reorder">
+          <button class="rbtn" data-act="up" data-id="${t.id}" ${i === 0 ? "disabled" : ""}>${gChevron("up")}</button>
+          <button class="rbtn" data-act="down" data-id="${t.id}" ${i === tasks.length - 1 ? "disabled" : ""}>${gChevron("down")}</button>
+        </span>
+        <span class="row-ic-wrap">${iconMarkup(t.emoji, "row-ic")}</span>
+        <span class="row-label" data-act="edit" data-id="${t.id}">${esc(t.name)}<span class="row-meta">${metaLabel(t)}</span></span>
+        <button class="icon-btn" data-act="copy" data-id="${t.id}" aria-label="Copy">${gCopy()}</button>
+        <button class="icon-btn danger" data-act="delete" data-id="${t.id}" aria-label="Delete">${gTrash()}</button>
+      </div>`;
+    }
+    const d = doneToday(t);
+    return `<div class="row">
+      <button class="check ${d ? "on" : ""}" data-act="toggle" data-id="${t.id}">${d ? CHECK_SVG : ""}</button>
+      <span class="row-ic-wrap">${iconMarkup(t.emoji, "row-ic")}</span>
+      <span class="row-label">${esc(t.name)}<span class="row-meta">${metaLabel(t)}</span></span>
+      <button class="edit-link" data-act="edit" data-id="${t.id}">Edit</button>
+    </div>`;
+  }).join("");
+
+  $("group-task-list").querySelectorAll("[data-act]").forEach((el) => {
+    el.onclick = () => {
+      const id = el.dataset.id;
+      const t = db.tasks.find((x) => x.id === id);
+      if (!t) return;
+      switch (el.dataset.act) {
+        case "toggle": toggle(t); renderGroupSheet(); break;
+        case "edit": hideSheet("group-sheet"); openEdit(t); break;
+        case "up": moveStep(id, -1); renderGroupSheet(); render(); break;
+        case "down": moveStep(id, 1); renderGroupSheet(); render(); break;
+        case "copy": openCopyDialog(t); break;
+        case "delete":
+          if (confirm(`Delete "${t.name}"? This removes the step and its history.`)) {
+            deleteStep(id); renderGroupSheet(); render();
+          }
+          break;
+      }
+    };
+  });
+}
+
+function openAddToGroup(name) {
+  openAdd();
+  $("group-input").value = name;
+  renderGroupChips();
+}
+
+// Copy-count dialog
+let copyTargetId = null, copyCount = 1;
+function openCopyDialog(task) {
+  copyTargetId = task.id;
+  copyCount = 1;
+  $("copy-sub").textContent = `How many copies of "${task.name}"?`;
+  $("copy-count").textContent = copyCount;
+  $("dialog-backdrop").style.display = "block";
+  $("copy-dialog").style.display = "block";
+}
+function closeCopyDialog() {
+  $("copy-dialog").style.display = "none";
+  $("dialog-backdrop").style.display = "none";
+  copyTargetId = null;
+}
+function bumpCopy(delta) {
+  copyCount = Math.max(1, Math.min(20, copyCount + delta));
+  $("copy-count").textContent = copyCount;
+}
+function confirmCopy() {
+  if (copyTargetId) copyStep(copyTargetId, copyCount);
+  closeCopyDialog();
+  renderGroupSheet();
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Settings · Backup / Restore
+// ─────────────────────────────────────────────────────────────
+function openSettings() {
+  const s = db.appState;
+  $("stat-cur").textContent = s.currentStreak;
+  $("stat-best").textContent = s.longestStreak;
+  $("stat-freeze").textContent = s.freezeCount;
+  $("stat-tasks").textContent = db.tasks.length;
+  $("stat-days").textContent = new Set(db.completions.map((c) => c.dateCompleted)).size;
+  showSheet("settings-sheet");
+}
+
+function exportBackup() {
+  const data = JSON.stringify(db, null, 2);
+  try {
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tasktrail-backup-${todayKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {}
+  if (navigator.clipboard) navigator.clipboard.writeText(data).catch(() => {});
+  showToast("Backup exported");
+}
+
+function importBackup(text) {
+  let parsed;
+  try { parsed = JSON.parse(text); } catch (e) { alert("That file isn't valid backup JSON."); return; }
+  if (!parsed || !Array.isArray(parsed.tasks) || !Array.isArray(parsed.completions) || typeof parsed.appState !== "object") {
+    alert("That doesn't look like a TaskTrail backup."); return;
+  }
+  if (!confirm("Replace all current data with this backup? This can't be undone.")) return;
+  db = {
+    tasks: parsed.tasks,
+    completions: parsed.completions,
+    appState: Object.assign(
+      { currentStreak: 0, longestStreak: 0, lastCompletedDay: null, freezeCount: 0, lastFreezeRefillDate: null },
+      parsed.appState
+    ),
+  };
+  save();
+  hideSheet("settings-sheet");
+  render();
+  showToast("Backup restored");
+}
+
+function resetAll() {
+  if (!confirm("Delete ALL tasks, history and streaks? This can't be undone.")) return;
+  db = { tasks: [], completions: [], appState: { currentStreak: 0, longestStreak: 0, lastCompletedDay: null, freezeCount: 0, lastFreezeRefillDate: null } };
+  save();
+  hideSheet("settings-sheet");
+  render();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Sheet show/hide
+// ─────────────────────────────────────────────────────────────
+let openSheets = 0;
+function showSheet(id) { $(id).classList.add("show"); $("sheet-backdrop").classList.add("show"); openSheets++; }
+function hideSheet(id) { $(id).classList.remove("show"); openSheets = Math.max(0, openSheets - 1); if (openSheets === 0) $("sheet-backdrop").classList.remove("show"); }
+
+// ─────────────────────────────────────────────────────────────
+// Wire up events
+// ─────────────────────────────────────────────────────────────
+$("fab").onclick = openAdd;
+$("edit-cancel").onclick = () => hideSheet("edit-sheet");
+$("edit-save").onclick = saveTask;
+$("delete-btn").onclick = deleteTask;
+$("name-input").oninput = validateSave;
+$("group-input").oninput = renderGroupChips;
+$("emoji-btn").onclick = openEmojiPicker;
+$("emoji-cancel").onclick = () => hideSheet("emoji-sheet");
+$("due-toggle").onchange = (e) => { $("due-time-row").style.display = e.target.checked ? "" : "none"; };
+$("timer-toggle").onchange = (e) => { $("timer-row").style.display = e.target.checked ? "" : "none"; };
+$("settings-btn").onclick = openSettings;
+$("settings-close").onclick = () => hideSheet("settings-sheet");
+$("export-btn").onclick = exportBackup;
+$("import-btn").onclick = () => $("import-file").click();
+$("import-file").onchange = (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => importBackup(r.result);
+  r.readAsText(f);
+  e.target.value = "";
+};
+$("reset-btn").onclick = resetAll;
+$("bubble-btn").onclick = bubbleAction;
+$("bubble-link").onclick = bubbleUndo;
+$("bubble-backdrop").onclick = closeBubble;
+$("lesson-action").onclick = lessonAction;
+$("lesson-quit").onclick = finishLesson;
+$("group-close").onclick = () => hideSheet("group-sheet");
+$("group-add-btn").onclick = () => { hideSheet("group-sheet"); openAddToGroup(groupSheetName); };
+$("group-edit-toggle").onclick = () => { groupEditMode = !groupEditMode; renderGroupSheet(); };
+$("copy-minus").onclick = () => bumpCopy(-1);
+$("copy-plus").onclick = () => bumpCopy(1);
+$("copy-cancel").onclick = closeCopyDialog;
+$("copy-confirm").onclick = confirmCopy;
+$("dialog-backdrop").onclick = closeCopyDialog;
+$("sheet-backdrop").onclick = () => {
+  ["emoji-sheet", "edit-sheet", "settings-sheet", "group-sheet"].forEach((id) => { if ($(id).classList.contains("show")) hideSheet(id); });
+};
+
+// Re-evaluate "live" nodes periodically
+setInterval(render, 60000);
+// Keep the trail line aligned when the viewport changes
+let resizeRAF;
+window.addEventListener("resize", () => { cancelAnimationFrame(resizeRAF); resizeRAF = requestAnimationFrame(drawTrailPath); });
+
+// ─────────────────────────────────────────────────────────────
+// Launch
+// ─────────────────────────────────────────────────────────────
+$("fab").innerHTML = gPlus();
+normalizeOrder();
+StreakEngine.auditOnLaunch();
+save();
+render();
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+</script>
+</body>
+</html>
